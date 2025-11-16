@@ -1,0 +1,6 @@
+@Recam.API_HostAddress = http://localhost:5076
+
+GET {{Recam.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
