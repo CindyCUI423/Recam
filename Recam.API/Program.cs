@@ -1,4 +1,7 @@
 
+using Microsoft.EntityFrameworkCore;
+using Recam.DataAccess.Data;
+
 namespace Recam.API;
 
 public class Program
@@ -14,6 +17,12 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
+        // Register DB
+        builder.Services.AddDbContext<RecamDbContext>(
+            options => options.UseSqlServer(builder.Configuration.GetConnectionString("RECAM-SQLSERVER"))
+        );
+        
+        
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
