@@ -1,6 +1,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Recam.DataAccess.Data;
+using Recam.Models.Settings;
 
 namespace Recam.API;
 
@@ -17,11 +18,19 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
-        // Register DB
+        // Register SQL Server DB
         builder.Services.AddDbContext<RecamDbContext>(
             options => options.UseSqlServer(builder.Configuration.GetConnectionString("RECAM-SQLSERVER"))
         );
-        
+
+        builder.Services.Configure<MongoDbSettings>(
+            options => {
+                options.ConnectionStrings = builder.Configuration["ConfigurationStrings:MongoDb"];
+                options.DatabaseName = builder.Configuration["DatabaseSettings:DatabaseName"];
+            }
+        );
+
+        builder.Services.AddSingleton<MongoDbContext>();
         
         var app = builder.Build();
 

@@ -8,8 +8,8 @@ namespace Recam.Models.Enums
 {
     public enum ListingCaseStatus
     {
-        ForSale,
-        ForRent,
-        Auction
+        Created,
+        Pending,
+        Delivered
     }
 }
