@@ -20,18 +20,6 @@ namespace Recam.Models.Entities
         public string CompanyName { get; set; }
         public ICollection<AgentListingCase> AgentListingCases { get; set; } = new List<AgentListingCase>();
         public ICollection<AgentPhotographyCompany> AgentPhotographyCompanies { get; set; } = new List<AgentPhotographyCompany>();
-        public Agent()
-        {
-            
-        }
-        public Agent(string id, string firstName, string lastName, string avatarUrl, string companyName)
-        {
-            Id = id;
-            AgentFirstName = firstName;
-            AgentLastName = lastName;
-            AvatarUrl = avatarUrl;
-            CompanyName = companyName;
-        }
 
     }
 }

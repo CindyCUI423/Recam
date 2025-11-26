@@ -16,14 +16,5 @@ namespace Recam.Models.Entities
         public User User { get; set; }
         public string PhotographyCompanyName { get; set; }
         public ICollection<AgentPhotographyCompany> AgentPhotographyCompanies { get; set; } = new List<AgentPhotographyCompany>();
-        public PhotographyCompany()
-        {
-            
-        }
-        public PhotographyCompany(string id, string companyName)
-        {
-            Id = id;
-            PhotographyCompanyName = companyName;
-        }
     }
 }

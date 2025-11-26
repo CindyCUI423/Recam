@@ -1,44 +1,159 @@
-
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Recam.Common.Exceptions;
+using Recam.DataAccess.Collections;
 using Recam.DataAccess.Data;
+using Recam.DataAccess.Seeders;
+using Recam.Models.Entities;
 using Recam.Models.Settings;
+using Recam.Repositories.Interfaces;
+using Recam.Repositories.Repositories;
+using Recam.Services.DTOs;
+using Recam.Services.Interfaces;
+using Recam.Services.Mappers;
+using Recam.Services.Services;
+using Recam.Services.Validators;
+using System.Reflection;
+using System.Security.Claims;
 
 namespace Recam.API;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
 
-        builder.Services.AddControllers();
+        builder.Services.AddControllers()
+            .ConfigureApiBehaviorOptions(options =>
+            {
+
+                options.InvalidModelStateResponseFactory = context =>
+                {
+                    // Get all the errors form ModelState
+                    var errors = context.ModelState
+                        .Where(x => x.Value.Errors.Count > 0)
+                        .ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                        );
+
+                    var errorResponse = new ErrorResponse(
+                        statusCode: StatusCodes.Status400BadRequest,
+                        message: "One or more validation errors occurred. Please check your input.",
+                        errorType: "ValidationError")
+                    {
+                        Errors = errors
+                    };
+
+                    return new ObjectResult(errorResponse)
+                    {
+                        StatusCode = StatusCodes.Status400BadRequest
+                    };
+                };
+
+
+            });
+
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddSwaggerGen(options =>
+        {
+            var xmlFileName = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFileName);
+            options.IncludeXmlComments(xmlPath);
+        });
 
-        // Register SQL Server DB
+        // Register SQL Server
         builder.Services.AddDbContext<RecamDbContext>(
             options => options.UseSqlServer(builder.Configuration.GetConnectionString("RECAM-SQLSERVER"))
         );
 
+        // Register MongoDB
         builder.Services.Configure<MongoDbSettings>(
             options => {
-                options.ConnectionStrings = builder.Configuration["ConfigurationStrings:MongoDb"];
+                options.ConnectionStrings = builder.Configuration["ConnectionStrings:MongoDb"];
                 options.DatabaseName = builder.Configuration["DatabaseSettings:DatabaseName"];
             }
         );
 
         builder.Services.AddSingleton<MongoDbContext>();
-        
+
+        // Regiester Identity, UserManager
+        builder.Services.AddIdentity<User, Role>()
+            .AddEntityFrameworkStores<RecamDbContext>()
+            .AddDefaultTokenProviders();
+        // Configure user signup password rules
+        builder.Services.Configure<IdentityOptions>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.Password.RequiredLength = 8;
+        });
+
+        // Register Services and Repositories
+        builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+        builder.Services.AddScoped<IAuthService, AuthService>();
+        builder.Services.AddSingleton<IUserActivityLogRepository, UserActivityLogRepository>();
+
+
+        // Register UnitOfWork to handle transaction
+        builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Register global exception handler
+        builder.Services.AddSingleton<GlobalExceptionHandler>();
+
+        // Register AutoMapper
+        builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+        // Register FluentValidator
+        builder.Services.AddValidatorsFromAssemblyContaining<SignUpRequestValidator>();
+        builder.Services.AddFluentValidationAutoValidation();
+
+
+        // Register Authorization
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy("AdminPolicy",
+                policy => policy.RequireClaim(ClaimTypes.Role, "Admin"));
+            options.AddPolicy("UserPolicy",
+                policy => policy.RequireClaim(ClaimTypes.Role, "User"));
+        });
+
         var app = builder.Build();
+
+        // Activate global exception handler by adding the middleware
+        app.UseExceptionHandler(
+            errorApp => 
+            {
+                errorApp.Run(async context =>
+                {
+                    var exceptionHandler = context.RequestServices.GetRequiredService<GlobalExceptionHandler>();
+                    await exceptionHandler.HandleException(context);
+                }
+                );
+            }
+        );
 
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
             app.UseSwaggerUI();
+        }
+
+        // Call seeder
+        using (var scope = app.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
+            await RecamDbSeeder.SeedAsync(services);
         }
 
         app.UseHttpsRedirection();
