@@ -22,6 +22,11 @@ namespace Recam.Services.Mappers
             // PhotographyCompanySignUpInfo -> PhotographyCompany
             CreateMap<PhotographyCompanySignUpInfo, PhotographyCompany>();
 
+            // Agent -> AgentInfo
+            CreateMap<Agent, AgentInfo>();
+
+            // PhotographyCompany -> PhotographyCompanyInfo
+            CreateMap<PhotographyCompany, PhotographyCompanyInfo>();
         }
     }
 }

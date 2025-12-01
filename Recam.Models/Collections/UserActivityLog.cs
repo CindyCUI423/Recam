@@ -14,14 +14,18 @@ namespace Recam.Models.Collections
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; }
         [BsonElement("userId")]
-        public string UserId { get; set; }
+        public string? UserId { get; set; }
         [BsonElement("userName")]
-        public string UserName { get; set; }
+        public string? UserName { get; set; }
+        [BsonElement("email")]
+        public string Email { get; set; }
         [BsonElement("occurredAt")]
         public DateTime OccurredAt { get; set; }
         [BsonElement("action")]
         public string Action { get; set; }
         [BsonElement("isSuccessful")]
         public bool IsSuccessful { get; set; }
+        [BsonElement("message")]
+        public string? Message { get; set; }
     }
 }

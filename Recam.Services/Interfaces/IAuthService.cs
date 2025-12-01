@@ -10,6 +10,7 @@ namespace Recam.Services.Interfaces
     public interface IAuthService
     {
         Task<string> SignUp(SignUpRequest request);
+        Task<LoginResponse> Login(LoginRequest request);
 
     }
 }

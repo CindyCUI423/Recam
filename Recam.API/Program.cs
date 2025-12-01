@@ -85,18 +85,21 @@ public class Program
         builder.Services.AddSingleton<MongoDbContext>();
 
         // Regiester Identity, UserManager
-        builder.Services.AddIdentity<User, Role>()
-            .AddEntityFrameworkStores<RecamDbContext>()
-            .AddDefaultTokenProviders();
-        // Configure user signup password rules
-        builder.Services.Configure<IdentityOptions>(options =>
+        builder.Services.AddIdentity<User, Role>(options =>
         {
+            // Configure user signup password rules
             options.Password.RequireDigit = true;
             options.Password.RequireLowercase = true;
             options.Password.RequireUppercase = true;
             options.Password.RequireNonAlphanumeric = true;
             options.Password.RequiredLength = 8;
-        });
+
+            // Configure user rules
+            options.User.RequireUniqueEmail = true;
+        })
+            .AddEntityFrameworkStores<RecamDbContext>()
+            .AddDefaultTokenProviders();
+        
 
         // Register Services and Repositories
         builder.Services.AddScoped<IAuthRepository, AuthRepository>();

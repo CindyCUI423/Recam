@@ -12,11 +12,13 @@ using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using Role = Recam.Models.Entities.Role;
 
 namespace Recam.Services.Services
 {
@@ -29,12 +31,14 @@ namespace Recam.Services.Services
         private IMapper _mapper;
         private readonly UserManager<User> _userManager;
         private readonly RoleManager<Role> _roleManager;
+        private readonly SignInManager<User> _signInManager;
         private readonly IValidator<SignUpRequest> _signUpValidator;
         private readonly IUnitOfWork _unitOfWork;
 
         public AuthService(IAuthRepository authRepository, IUserActivityLogRepository userActivityLogRepository,
             IConfiguration configuration, IMapper mapper,
-            UserManager<User> userManager, RoleManager<Role> roleManager, IUnitOfWork unitOfWork)
+            UserManager<User> userManager, RoleManager<Models.Entities.Role> roleManager, SignInManager<User> signInManager,
+            IUnitOfWork unitOfWork)
         {
             _authRepository = authRepository;
             _userActivityLogRepository = userActivityLogRepository;
@@ -42,6 +46,7 @@ namespace Recam.Services.Services
             _mapper = mapper;
             _userManager = userManager;
             _roleManager = roleManager;
+            _signInManager = signInManager;
             _unitOfWork = unitOfWork;
         }
 
@@ -107,7 +112,7 @@ namespace Recam.Services.Services
                 await _unitOfWork.Commit();
 
                 // Log user activity to MongoDB when successfully signed up
-                await LogUserActivity(user.Id, user.UserName, "SignUp", result);
+                await LogUserActivity(user.Id, user.UserName, user.Email, "SignUp", result.Succeeded, "Successfully signed up.");
 
             }
             catch (Exception)
@@ -123,7 +128,96 @@ namespace Recam.Services.Services
             return user.Id;
         }
 
-        private string JWTGenerator(User user)
+        public async Task<LoginResponse> Login(LoginRequest request)
+        {
+            var user = await _userManager.FindByEmailAsync(request.Email);
+
+            // User not found
+            if (user == null)
+            {
+                // Log failed user login attempts to MongoDB for security purpose
+                await LogUserActivity(userId: null, userName: null, request.Email, "Login", false, LoginStatus.UserNotFound.ToString());
+
+                return new LoginResponse
+                {
+                    Status = LoginStatus.UserNotFound,
+                    ErrorMessage = "User not found.",
+                };
+            }
+
+            var loginResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+
+            // Login failure
+            if (!loginResult.Succeeded)
+            {
+                var status = loginResult.IsLockedOut
+                    ? LoginStatus.LockedOut
+                    : loginResult.IsNotAllowed
+                        ? LoginStatus.NotAllowed
+                        : LoginStatus.InvalidCredentials;
+
+                // Log failed user login attempts to MongoDB for security purpose
+                await LogUserActivity(user.Id, user.UserName, user.Email, "Login", false, status.ToString());
+
+                return new LoginResponse
+                {
+                    Status = status,
+                    ErrorMessage = status switch
+                    {
+                        LoginStatus.LockedOut => "Your account is locked out. Please try again later.",
+                        LoginStatus.NotAllowed => "Your are not allowed to login. Please verify your email first.",
+                        _ => "Incorrect email or password."
+                    }
+                };
+            }
+
+            // Login success
+            var token = JWTGenerator(user, 7);
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var role = roles[0];
+
+            // Log successful user login activity
+            await LogUserActivity(user.Id, user.UserName, user.Email, "Login", true, "Successfully logged in.");
+
+            var response = new LoginResponse
+            {
+                Status = LoginStatus.Success,
+                UserInfo = new UserDto
+                {
+                    Id = user.Id,
+                    UserName = user.UserName,
+                    Email = user.Email,
+                    Role = role,
+                    Token = token,
+                    ExpiresAt = DateTime.Now.AddDays(7)
+                }
+
+            };
+
+            if (role == "Agent")
+            {
+                var agent = await _authRepository.GetAgentByUserId(user.Id);
+
+                if (agent != null)
+                {
+                    response.AgentInfo = _mapper.Map<AgentInfo>(agent);
+                }
+            }
+            else if (role == "PhotographyCompany")
+            {
+                var photographyCompany = await _authRepository.GetPhotographyCompanyByUserId(user.Id);
+
+                if (photographyCompany != null)
+                {
+                    response.PhotographyCompanyInfo = _mapper.Map<PhotographyCompanyInfo>(photographyCompany);
+                }
+            }
+
+            return response;
+        }
+
+        private string JWTGenerator(User user, int days)
         {
             var claims = new List<Claim>
             {
@@ -147,22 +241,24 @@ namespace Recam.Services.Services
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddDays(7),
+                expires: DateTime.Now.AddDays(days),
                 signingCredentials: signature
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private async Task LogUserActivity(string userId, string userName, string action, IdentityResult result)
+        private async Task LogUserActivity(string? userId, string? userName, string email, string action, bool result, string? message)
         {
             var log = new UserActivityLog
             {
                 UserId = userId,
                 UserName = userName,
+                Email = email,
                 OccurredAt = DateTime.UtcNow,
                 Action = action,
-                IsSuccessful = result.Succeeded
+                IsSuccessful = result,
+                Message = message,
             };
 
             try

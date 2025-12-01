@@ -36,6 +36,48 @@ namespace Recam.API.Controllers
             //TODO: change to CreatedAtAction when Get user API is implemented
             return Created(string.Empty, userId);
         }
+
+        /// <summary>
+        /// User login
+        /// </summary>
+        /// <param name="request">Necessary login information</param>
+        /// <returns>Returns ...</returns>
+        [HttpPost("login")]
+        [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status423Locked)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            var response = await _authService.Login(request);
+
+            switch (response.Status)
+            {
+                case LoginStatus.Success:
+                    return Ok(response);
+
+                case LoginStatus.UserNotFound:
+                    return Unauthorized(new ErrorResponse(401, response.ErrorMessage, "UserNotFound"));
+
+                case LoginStatus.InvalidCredentials:
+                    return Unauthorized(new ErrorResponse(401, response.ErrorMessage, "InvalidaCredentials"));
+
+                case LoginStatus.LockedOut:
+                    return StatusCode(StatusCodes.Status423Locked,
+                        new ErrorResponse(423, response.ErrorMessage, "LockedOut")
+                    );
+
+                case LoginStatus.NotAllowed:
+                    return StatusCode(StatusCodes.Status403Forbidden,
+                        new ErrorResponse(403, response.ErrorMessage, "UnverifiedEmail"));
+
+                default:
+                    return BadRequest(new ErrorResponse(400, response.ErrorMessage, "LoginFailed"));
+                       
+            }
+
+        }
         
 
     }

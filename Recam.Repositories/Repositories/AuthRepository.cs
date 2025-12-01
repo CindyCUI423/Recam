@@ -1,4 +1,5 @@
-﻿using Recam.DataAccess.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Recam.DataAccess.Data;
 using Recam.Models.Entities;
 using Recam.Repositories.Interfaces;
 using System;
@@ -26,6 +27,16 @@ namespace Recam.Repositories.Repositories
         public async Task AddPhotographyCompany(PhotographyCompany photographyCompany)
         {
             await _dbContext.PhotographyCompanies.AddAsync(photographyCompany);
+        }
+
+        public async Task<Agent?> GetAgentByUserId(string userId)
+        {
+            return await _dbContext.Agents.FindAsync(userId);
+        }
+
+        public async Task<PhotographyCompany?> GetPhotographyCompanyByUserId(string userId)
+        {
+            return await _dbContext.PhotographyCompanies.FindAsync(userId);
         }
     }
 }

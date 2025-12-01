@@ -11,5 +11,7 @@ namespace Recam.Repositories.Interfaces
     {
         Task AddAgent(Agent agent);
         Task AddPhotographyCompany(PhotographyCompany photographyCompany);
+        Task<Agent?> GetAgentByUserId(string userId);
+        Task<PhotographyCompany?> GetPhotographyCompanyByUserId(string userId);
     }
 }
