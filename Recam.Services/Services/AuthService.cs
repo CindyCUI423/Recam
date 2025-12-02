@@ -50,39 +50,54 @@ namespace Recam.Services.Services
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<string> SignUp(SignUpRequest request)
+        public async Task<SignUpResponse> SignUp(SignUpRequest request)
         {
             await _unitOfWork.BeginTransaction();
 
             var roleType = request.RoleType.Trim();
 
-            // Check if Username is unique
-            var existingByName = await _userManager.FindByEmailAsync(request.UserName);
-            if (existingByName != null)
-            {
-                throw new ConflictException("Username is already taken.");
-            }
-
-            // Check if Email is unique
-            var existingByEmail = await _userManager.FindByEmailAsync(request.Email);
-            if (existingByEmail != null)
-            {
-                throw new ConflictException("Email is already in use.");
-            }
-
-            // Create new user
-            var user = _mapper.Map<User>(request);
-            user.IsDeleted = false;
-            user.CreatedAt = DateTime.UtcNow;
-
-            IdentityResult result;
-
             try
             {
-                result = await _userManager.CreateAsync(user, request.Password);
+                // Check if Username is unique
+                var existingByName = await _userManager.FindByEmailAsync(request.UserName);
+                if (existingByName != null)
+                {
+                    return new SignUpResponse
+                    {
+                        Status = SignUpStatus.UserNameAlreadyExists,
+                        ErrorMessage = "Username is already taken."
+                    };
+                }
+
+                // Check if Email is unique
+                var existingByEmail = await _userManager.FindByEmailAsync(request.Email);
+                if (existingByEmail != null)
+                {
+                    return new SignUpResponse
+                    {
+                        Status = SignUpStatus.EmailAlreadyExists,
+                        ErrorMessage = "Email is already in use."
+                    };
+                }
+
+                // Create new user
+                var user = _mapper.Map<User>(request);
+                user.IsDeleted = false;
+                user.CreatedAt = DateTime.UtcNow;
+
+                var result = await _userManager.CreateAsync(user, request.Password);
                 if (!result.Succeeded)
                 {
-                    throw new Exception("Failed to create the user through UserManager");
+                    // Get message from IdentityResult
+                    var message = string.Join(";", result.Errors.Select(e => e.Description));
+
+                    await _unitOfWork.Rollback();
+
+                    return new SignUpResponse
+                    {
+                        Status = SignUpStatus.CreateUserFailure,
+                        ErrorMessage= message
+                    };
                 }
 
                 // Create Agent or PhotographyCompany
@@ -106,7 +121,15 @@ namespace Recam.Services.Services
                 var userRoleResult = await _userManager.AddToRoleAsync(user, roleType);
                 if (!userRoleResult.Succeeded)
                 {
-                    throw new Exception("Failed to assign user role.");
+                    var message = string.Join(";", userRoleResult.Errors.Select(e => e.Description));
+
+                    await _unitOfWork.Rollback();
+
+                    return new SignUpResponse
+                    {
+                        Status = SignUpStatus.AssignRoleFailure,
+                        ErrorMessage = message
+                    };
                 }
 
                 await _unitOfWork.Commit();
@@ -114,18 +137,19 @@ namespace Recam.Services.Services
                 // Log user activity to MongoDB when successfully signed up
                 await LogUserActivity(user.Id, user.UserName, user.Email, "SignUp", result.Succeeded, "Successfully signed up.");
 
+                // On success
+                return new SignUpResponse
+                {
+                    Status = SignUpStatus.Success,
+                    UserId = user.Id,
+                };
+
             }
             catch (Exception)
             {
                 await _unitOfWork.Rollback();
                 throw;
             }
-
-            
-            
-
-            // Return user Id when successful
-            return user.Id;
         }
 
         public async Task<LoginResponse> Login(LoginRequest request)

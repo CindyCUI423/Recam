@@ -23,25 +23,56 @@ namespace Recam.API.Controllers
         /// New user sign up as an agent or photography company
         /// </summary>
         /// <param name="request">Necessary sign up information</param>
-        /// <returns>Returns user Id if successfully created</returns>
+        /// <returns>
+        /// User's Id on success
+        /// </returns>
         [HttpPost("signup")]
         [ProducesResponseType(typeof(string), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
         {
-            var userId = await _authService.SignUp(request);
+            var result = await _authService.SignUp(request);
 
-            //TODO: change to CreatedAtAction when Get user API is implemented
-            return Created(string.Empty, userId);
+            switch (result.Status)
+            {
+                case SignUpStatus.Success:
+                    return Created(string.Empty, result.UserId);
+
+                case SignUpStatus.UserNameAlreadyExists:
+                case SignUpStatus.EmailAlreadyExists:
+                    return StatusCode(StatusCodes.Status409Conflict, 
+                        new ErrorResponse(StatusCodes.Status409Conflict,
+                            result.ErrorMessage ?? "User already exists.",
+                            result.Status.ToString()));
+
+                case SignUpStatus.CreateUserFailure:
+                    return BadRequest(
+                        new ErrorResponse(StatusCodes.Status400BadRequest,
+                            result.ErrorMessage ?? "Failed to create the user. Please check if your password meet all the requirements.", 
+                            result.Status.ToString()));
+
+                case SignUpStatus.AssignRoleFailure:
+                    return BadRequest(
+                        new ErrorResponse(StatusCodes.Status400BadRequest,
+                            result.ErrorMessage ?? "Invalid role type.",
+                            result.Status.ToString()));
+
+                default:
+                    return BadRequest(
+                        new ErrorResponse(StatusCodes.Status400BadRequest,
+                            result.ErrorMessage ?? "Sign up failed for some reasons.",
+                            result.Status.ToString()));
+            }
         }
 
         /// <summary>
         /// User login
         /// </summary>
         /// <param name="request">Necessary login information</param>
-        /// <returns>Returns ...</returns>
+        /// <returns>
+        /// User's information and token on success
+        /// </returns>
         [HttpPost("login")]
         [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]

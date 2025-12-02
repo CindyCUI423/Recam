@@ -1,8 +1,11 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Recam.Common.Exceptions;
 using Recam.DataAccess.Collections;
 using Recam.DataAccess.Data;
@@ -18,6 +21,7 @@ using Recam.Services.Services;
 using Recam.Services.Validators;
 using System.Reflection;
 using System.Security.Claims;
+using System.Text;
 
 namespace Recam.API;
 
@@ -64,6 +68,28 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {
+            options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Description = "Jwt Authorization",
+                Name = "Authorization",
+                In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+                Scheme = "bearer"
+            });
+            options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer"
+                        }
+                    },
+                    new string[] { }
+                }
+            });
             var xmlFileName = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFileName);
             options.IncludeXmlComments(xmlPath);
@@ -121,13 +147,33 @@ public class Program
         builder.Services.AddFluentValidationAutoValidation();
 
 
-        // Register Authorization
+        // Register Authorization - assign JWT
+        // TODO: change the role name
         builder.Services.AddAuthorization(options =>
         {
             options.AddPolicy("AdminPolicy",
                 policy => policy.RequireClaim(ClaimTypes.Role, "Admin"));
             options.AddPolicy("UserPolicy",
                 policy => policy.RequireClaim(ClaimTypes.Role, "User"));
+        });
+
+        // Register Authentication - verify JWT
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            };
         });
 
         var app = builder.Build();
