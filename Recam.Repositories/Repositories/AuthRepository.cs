@@ -38,5 +38,22 @@ namespace Recam.Repositories.Repositories
         {
             return await _dbContext.PhotographyCompanies.FindAsync(userId);
         }
+
+        public async Task<List<User>> GetUsersPaginated(int pageNumber, int pageSize)
+        {
+            return await _dbContext.Users
+                .AsNoTracking()
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role) // Include user's role
+                .OrderBy(u => u.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+
+        public async Task<int> GetUsersTotal()
+        {
+            return await _dbContext.Users.CountAsync();
+        }
     }
 }

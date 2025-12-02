@@ -207,7 +207,7 @@ namespace Recam.Services.Services
             var response = new LoginResponse
             {
                 Status = LoginStatus.Success,
-                UserInfo = new UserDto
+                UserInfo = new UserLoginDto
                 {
                     Id = user.Id,
                     UserName = user.UserName,
@@ -295,5 +295,28 @@ namespace Recam.Services.Services
             }
         }
 
+        public async Task<GetUsersResponse> GetAllUsers(int pageNumber, int pageSize)
+        {
+            if (pageNumber < 1 || pageSize < 1)
+            {
+                return new GetUsersResponse
+                {
+                    Status = GetUsersStatus.Error,
+                    ErrorMessage = "pageNumber and pageSize must be greater than 0."
+                };
+            }
+            
+            var users = await _authRepository.GetUsersPaginated(pageNumber, pageSize);
+            var totalCount = await _authRepository.GetUsersTotal();
+
+            var userDtos = _mapper.Map<List<UserDto>>(users);
+
+            return new GetUsersResponse
+            {
+                Status = GetUsersStatus.Success,
+                Users = userDtos,
+                TotalCount = totalCount
+            };
+        }
     }
 }

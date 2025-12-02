@@ -10,7 +10,7 @@ namespace Recam.Services.DTOs
     {
         public LoginStatus Status { get; set; }
         public string? ErrorMessage { get; set; }
-        public UserDto? UserInfo { get; set; }
+        public UserLoginDto? UserInfo { get; set; }
         public AgentInfo? AgentInfo { get; set; }
         public PhotographyCompanyInfo? PhotographyCompanyInfo { get; set; }
     }
@@ -24,7 +24,7 @@ namespace Recam.Services.DTOs
         InvalidCredentials,
         Error
     }
-    public class UserDto
+    public class UserLoginDto
     {
         public string Id { get; set; }
         public string UserName { get; set; }

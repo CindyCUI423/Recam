@@ -5,6 +5,7 @@ using Recam.Models.Entities;
 using Recam.Services.Interfaces;
 using AutoMapper;
 using Recam.Common.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Recam.API.Controllers
 {
@@ -109,7 +110,37 @@ namespace Recam.API.Controllers
             }
 
         }
-        
 
+        /// <summary>
+        /// Get all users (support pagination)
+        /// </summary>
+        /// <param name="pageNumber">Number of the page</param>
+        /// <param name="pageSize">Numbers of users retrieved per page</param>
+        /// <returns>
+        /// User's information and total count of users on success
+        /// </returns>
+        [HttpGet("users")]
+        [Authorize(Policy = "PhotographyCompanyPolicy")]
+        [ProducesResponseType(typeof(GetUsersResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetAllUsers([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        {
+            var result = await _authService.GetAllUsers(pageNumber, pageSize);
+
+            if (result.Status == GetUsersStatus.Error)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "pageNumber and pageSize must be greater than 0.",
+                        "InvalidPagination"));
+            }
+            else
+            {
+                return Ok(result);
+            }
+            
+        }
+        
     }
 }

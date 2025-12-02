@@ -11,6 +11,6 @@ namespace Recam.Services.Interfaces
     {
         Task<SignUpResponse> SignUp(SignUpRequest request);
         Task<LoginResponse> Login(LoginRequest request);
-
+        Task<GetUsersResponse> GetAllUsers(int pageNumber, int pageSize);
     }
 }

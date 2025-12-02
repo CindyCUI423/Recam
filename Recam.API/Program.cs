@@ -22,6 +22,7 @@ using Recam.Services.Validators;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace Recam.API;
 
@@ -60,8 +61,11 @@ public class Program
                         StatusCode = StatusCodes.Status400BadRequest
                     };
                 };
-
-
+            })
+            .AddJsonOptions(options =>
+            {
+                // Configure enum converter --> convert enum to string
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
 
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -151,10 +155,10 @@ public class Program
         // TODO: change the role name
         builder.Services.AddAuthorization(options =>
         {
-            options.AddPolicy("AdminPolicy",
-                policy => policy.RequireClaim(ClaimTypes.Role, "Admin"));
-            options.AddPolicy("UserPolicy",
-                policy => policy.RequireClaim(ClaimTypes.Role, "User"));
+            options.AddPolicy("PhotographyCompanyPolicy",
+                policy => policy.RequireClaim(ClaimTypes.Role, "PhotographyCompany"));
+            options.AddPolicy("AgentPolicy",
+                policy => policy.RequireClaim(ClaimTypes.Role, "Agent"));
         });
 
         // Register Authentication - verify JWT

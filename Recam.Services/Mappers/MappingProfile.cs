@@ -27,6 +27,15 @@ namespace Recam.Services.Mappers
 
             // PhotographyCompany -> PhotographyCompanyInfo
             CreateMap<PhotographyCompany, PhotographyCompanyInfo>();
+
+            //
+            CreateMap<User, UserDto>()
+                .ForMember(
+                    dest => dest.Role,
+                    opt => opt.MapFrom(src => src.UserRoles
+                                                 .Select(ur => ur.Role.Name)
+                                                 .FirstOrDefault())
+                );
         }
     }
 }
