@@ -26,6 +26,16 @@ namespace Recam.DataAccess.Data
             
         }
 
+        public DbSet<User> Users { get; set; }
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<Agent> Agents { get; set; }
+        public DbSet<PhotographyCompany> PhotographyCompanies { get; set; }
+        public DbSet<ListingCase> ListingCases { get; set; }
+        public DbSet<AgentPhotographyCompany> AgentPhotographyCompanies { get; set; }
+        public DbSet<AgentListingCase> AgentListingCases { get; set; }
+        public DbSet<CaseContact> CaseContacts { get; set; }
+        public DbSet<MediaAsset> MediaAssets { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

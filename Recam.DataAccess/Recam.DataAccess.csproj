@@ -28,8 +28,4 @@
     <ProjectReference Include="..\Recam.Models\Recam.Models.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Collections\" />
-  </ItemGroup>
-
 </Project>
