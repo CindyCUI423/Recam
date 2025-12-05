@@ -18,6 +18,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Recam.DataAccess", "Recam.D
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Recam.Common", "Recam.Common\Recam.Common.csproj", "{8A2BB4E2-5355-448F-9D49-F46DE4271000}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Recam.UnitTests", "Recam.UnitTests\Recam.UnitTests.csproj", "{FAD85CF8-91A7-484A-9B09-BE35BF38D921}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +50,10 @@ Global
 		{8A2BB4E2-5355-448F-9D49-F46DE4271000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8A2BB4E2-5355-448F-9D49-F46DE4271000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8A2BB4E2-5355-448F-9D49-F46DE4271000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FAD85CF8-91A7-484A-9B09-BE35BF38D921}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FAD85CF8-91A7-484A-9B09-BE35BF38D921}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FAD85CF8-91A7-484A-9B09-BE35BF38D921}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FAD85CF8-91A7-484A-9B09-BE35BF38D921}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -28,13 +28,14 @@ namespace Recam.Services.Mappers
             // PhotographyCompany -> PhotographyCompanyInfo
             CreateMap<PhotographyCompany, PhotographyCompanyInfo>();
 
-            //
+            // User -> UserDto (used when getting user list)
             CreateMap<User, UserDto>()
                 .ForMember(
                     dest => dest.Role,
-                    opt => opt.MapFrom(src => src.UserRoles
-                                                 .Select(ur => ur.Role.Name)
-                                                 .FirstOrDefault())
+                    opt => opt.MapFrom(src => 
+                        src.UserRoles
+                           .Select(ur => ur.Role.Name)
+                           .FirstOrDefault())
                 );
         }
     }

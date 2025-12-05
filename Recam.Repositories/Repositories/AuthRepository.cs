@@ -45,7 +45,7 @@ namespace Recam.Repositories.Repositories
                 .AsNoTracking()
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role) // Include user's role
-                .OrderBy(u => u.Id)
+                .OrderBy(u => u.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

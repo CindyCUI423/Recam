@@ -30,14 +30,12 @@ namespace Recam.Services.Services
         private readonly IConfiguration _configuration;
         private IMapper _mapper;
         private readonly UserManager<User> _userManager;
-        private readonly RoleManager<Role> _roleManager;
         private readonly SignInManager<User> _signInManager;
-        private readonly IValidator<SignUpRequest> _signUpValidator;
         private readonly IUnitOfWork _unitOfWork;
 
         public AuthService(IAuthRepository authRepository, IUserActivityLogRepository userActivityLogRepository,
             IConfiguration configuration, IMapper mapper,
-            UserManager<User> userManager, RoleManager<Models.Entities.Role> roleManager, SignInManager<User> signInManager,
+            UserManager<User> userManager, SignInManager<User> signInManager,
             IUnitOfWork unitOfWork)
         {
             _authRepository = authRepository;
@@ -45,7 +43,6 @@ namespace Recam.Services.Services
             _configuration = configuration;
             _mapper = mapper;
             _userManager = userManager;
-            _roleManager = roleManager;
             _signInManager = signInManager;
             _unitOfWork = unitOfWork;
         }
@@ -59,7 +56,7 @@ namespace Recam.Services.Services
             try
             {
                 // Check if Username is unique
-                var existingByName = await _userManager.FindByEmailAsync(request.UserName);
+                var existingByName = await _userManager.FindByNameAsync(request.UserName);
                 if (existingByName != null)
                 {
                     return new SignUpResponse
