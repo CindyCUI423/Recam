@@ -37,6 +37,9 @@ namespace Recam.Services.Mappers
                            .Select(ur => ur.Role.Name)
                            .FirstOrDefault())
                 );
+
+            // CreateListingCaseRequest -> ListingCase
+            CreateMap<CreateListingCaseRequest, ListingCase>();
         }
     }
 }

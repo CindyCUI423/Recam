@@ -28,7 +28,7 @@ namespace Recam.DataAccess.Seeders
             await SeedRolesAsync(roleManager);
 
             // Seed default user data
-            await SeedDefaultUser(userManager, context);
+            await SeedDefaultUsers(userManager, context);
         }
 
         private static async Task SeedRolesAsync(RoleManager<Role> roleManager)
@@ -57,31 +57,37 @@ namespace Recam.DataAccess.Seeders
             }
         }
 
-        private static async Task SeedDefaultUser(UserManager<User> userManager, RecamDbContext context)
+        private static async Task SeedDefaultUsers(UserManager<User> userManager, RecamDbContext context)
         {
-            const string email = "example@example.com";
-            const string userName = "photography_admin";
+            const string pcEmail = "photography@example.com";
+            const string agentEmail = "agent@example.com";
+            const string pcUserName = "photography_admin";
+            const string agentUserName = "agent_user";
             const string password = "12345Abc!"; //TODO: Hardcoded password for now (change strategy when connected to cloud)
             const string photographyCompanyName = "Default Photography Company";
+            const string agentFistName = "AF";
+            const string agentLastName = "AL";
+            const string agentCompanyName = "Default Agent Company";
 
             // Check user's existance
-            var existingUser = await userManager.FindByEmailAsync(email);
+            var existingPC = await userManager.FindByEmailAsync(pcEmail);
+            var existingAgent = await userManager.FindByEmailAsync(agentEmail);
 
-            if (existingUser != null)
+            if (existingPC != null)
             {
                 // Check user role (PhotographyCompany) existancec
-                if (!await userManager.IsInRoleAsync(existingUser, "PhotographyCompany"))
+                if (!await userManager.IsInRoleAsync(existingPC, "PhotographyCompany"))
                 {
-                    await userManager.AddToRoleAsync(existingUser, "PhotographyCompany");
+                    await userManager.AddToRoleAsync(existingPC, "PhotographyCompany");
                 }
 
                 // Create PhotographyCompanyInfo if not existed
-                var existingPhotoCompany = await context.PhotographyCompanies.FirstOrDefaultAsync(p => p.Id == existingUser.Id);
+                var existingPhotoCompany = await context.PhotographyCompanies.FirstOrDefaultAsync(p => p.Id == existingPC.Id);
                 if (existingPhotoCompany == null)
                 {
                     context.PhotographyCompanies.Add( new PhotographyCompany 
                     {
-                        Id = existingUser.Id,
+                        Id = existingPC.Id,
                         PhotographyCompanyName = photographyCompanyName
                     });
 
@@ -91,39 +97,99 @@ namespace Recam.DataAccess.Seeders
                 return;
             }
 
-            // Create user
+            if (existingAgent != null)
+            {
+                // Check user role (Agent) existancec
+                if (!await userManager.IsInRoleAsync(existingAgent, "Agent"))
+                {
+                    await userManager.AddToRoleAsync(existingAgent, "Agent");
+                }
+
+                // Create AgentInfo if not existed
+                var existingAgentCompany = await context.Agents.FirstOrDefaultAsync(a => a.Id == existingAgent.Id);
+                if (existingAgentCompany == null)
+                {
+                    context.Agents.Add(new Agent
+                    {
+                        Id = existingAgent.Id,
+                        AgentFirstName = agentFistName,
+                        AgentLastName = agentLastName,
+                        CompanyName = agentCompanyName
+                    });
+
+                    await context.SaveChangesAsync();
+                }
+
+                return;
+            }
+
+            // Create users
             await using var transaction = await context.Database.BeginTransactionAsync();
 
             try
             {
-                var user = new User
+                var pcUser = new User
                 {
-                    UserName = userName,
-                    Email = email,
+                    UserName = pcUserName,
+                    Email = pcEmail,
                     EmailConfirmed = true,
                     IsDeleted = false,
                     CreatedAt = DateTime.UtcNow,
                 };
 
-                var createUserResult = await userManager.CreateAsync(user, password);
-                if (!createUserResult.Succeeded)
+                var agentUser = new User
                 {
-                    var message = string.Join(";", createUserResult.Errors.Select(e => e.Description));
-                    throw new Exception($"Failed to create default user {userName}: {message}.");
+                    UserName = agentUserName,
+                    Email = agentEmail,
+                    EmailConfirmed = true,
+                    IsDeleted = false,
+                    CreatedAt = DateTime.UtcNow,
+                };
+
+                // Create PhotographyCompany user
+                var createPCUserResult = await userManager.CreateAsync(pcUser, password);
+                if (!createPCUserResult.Succeeded)
+                {
+                    var message = string.Join(";", createPCUserResult.Errors.Select(e => e.Description));
+                    throw new Exception($"Failed to create default user {pcUserName}: {message}.");
                 }
 
-                var addToRoleResult = await userManager.AddToRoleAsync(user, "PhotographyCompany");
-                if (!addToRoleResult.Succeeded)
+                var addPCToRoleResult = await userManager.AddToRoleAsync(pcUser, "PhotographyCompany");
+                if (!addPCToRoleResult.Succeeded)
                 {
-                    var message = string.Join(";", addToRoleResult.Errors.Select(e => e.Description));
-                    throw new Exception($"Failed to assign Photography role to defult user {userName}: {message}.");
+                    var message = string.Join(";", addPCToRoleResult.Errors.Select(e => e.Description));
+                    throw new Exception($"Failed to assign Photography role to defult user {pcUserName}: {message}.");
                 }
 
                 context.PhotographyCompanies.Add(new PhotographyCompany
                 {
-                    Id = user.Id,
+                    Id = pcUser.Id,
                     PhotographyCompanyName = photographyCompanyName,
                 });
+
+                // Create Agent user
+                var createAgentUserResult = await userManager.CreateAsync(agentUser, password);
+                if (!createAgentUserResult.Succeeded)
+                {
+                    var message = string.Join(";", createAgentUserResult.Errors.Select(e => e.Description));
+                    throw new Exception($"Failed to create default user {agentUserName}: {message}.");
+                }
+
+                var addAgentToRoleResult = await userManager.AddToRoleAsync(agentUser, "Agent");    
+                if (!addAgentToRoleResult.Succeeded)
+                {
+                    var message = string.Join(";", addAgentToRoleResult.Errors.Select(e => e.Description));
+                    throw new Exception($"Failed to assign Agent role to defult user {agentUserName}: {message}.");
+                }
+
+                context.Agents.Add(new Agent
+                {
+                    Id = agentUser.Id,
+                    AgentFirstName = agentFistName,
+                    AgentLastName = agentLastName,
+                    CompanyName = agentCompanyName,
+                });
+
                 await context.SaveChangesAsync();
 
                 await transaction.CommitAsync();

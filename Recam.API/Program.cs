@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -22,6 +22,7 @@ using Recam.Services.Validators;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Recam.API;
@@ -135,6 +136,9 @@ public class Program
         builder.Services.AddScoped<IAuthRepository, AuthRepository>();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddSingleton<IUserActivityLogRepository, UserActivityLogRepository>();
+        builder.Services.AddSingleton<ICaseHistoryRepository, CaseHistoryRepository>();
+        builder.Services.AddScoped<IListingCaseRepository, ListingCaseRepository>();
+        builder.Services.AddScoped<IListingCaseService, ListingCaseService>();
 
 
         // Register UnitOfWork to handle transaction
@@ -152,7 +156,6 @@ public class Program
 
 
         // Register Authorization - assign JWT
-        // TODO: change the role name
         builder.Services.AddAuthorization(options =>
         {
             options.AddPolicy("PhotographyCompanyPolicy",
@@ -177,6 +180,40 @@ public class Program
                 ValidIssuer = builder.Configuration["Jwt:Issuer"],
                 ValidAudience = builder.Configuration["Jwt:Audience"],
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnChallenge = async context =>
+                {
+                    context.HandleResponse();
+
+                    var response = context.Response;
+                    response.StatusCode = StatusCodes.Status401Unauthorized;
+                    response.ContentType = "application/json";
+
+                    var error = new ErrorResponse(
+                        statusCode: StatusCodes.Status401Unauthorized,
+                        message: "Unauthorized. Please provide a valid access token.",
+                        errorType: "AuthorizationError");
+
+                    var json = JsonSerializer.Serialize(error);
+                    await response.WriteAsync(json);
+                },
+                OnForbidden = async context =>
+                {
+                    var response = context.Response;
+                    response.StatusCode = StatusCodes.Status403Forbidden;
+                    response.ContentType = "application/json";
+
+                    var error = new ErrorResponse(
+                        statusCode: StatusCodes.Status403Forbidden,
+                        message: "Forbidden. You don't have permission to access this resource.",
+                        errorType: "AuthorizationError");
+
+                    var json = JsonSerializer.Serialize(error);
+                    await response.WriteAsync(json);
+                }
             };
         });
 
@@ -212,7 +249,6 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
-
 
         app.MapControllers();
 
