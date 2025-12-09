@@ -58,16 +58,6 @@ namespace Recam.Services.Services
                 };
             }
 
-            // If user is not authenticated
-            if (string.IsNullOrWhiteSpace(userId))
-            {
-                return new GetListingCasesResponse
-                {
-                    Status = GetListingCasesStatus.Unauthorized,
-                    ErrorMessage = "User is not authenticated."
-                };
-            }
-
             List<ListingCase> cases;
 
             if (role == "PhotographyCompany")
@@ -107,7 +97,55 @@ namespace Recam.Services.Services
 
         }
 
+        public async Task<ListingCaseDetailResponse> GetListingCaseById(string? userId, string? role, int id)
+        {
+            ListingCase? listingCase = null;
 
+            if (role == "PhotographyCompany")
+            {
+                listingCase = await _listingCaseRepository.GetListingCaseDetailForPhotographyCompany(userId, id);
+            }
+            else if (role == "Agent")
+            {
+                listingCase = await _listingCaseRepository.GetListingCaseDetailForAgent(userId, id);
+            }
+            // If role is invalid
+            else
+            {
+                return new ListingCaseDetailResponse
+                {
+                    Status = ListingCaseDetailStatus.Unauthorized,
+                    ErrorMessage = "Invalid user role."
+                };
+            }
+
+            // Check if listing case exists
+            if (listingCase == null)
+            {
+                return new ListingCaseDetailResponse
+                {
+                    Status = ListingCaseDetailStatus.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            var mappedListingCase = _mapper.Map<ListingCaseDto>(listingCase);
+
+            var agents = listingCase?.AgentListingCases?
+                .Select(al => al.Agent)
+                .Where(a => a != null)
+                .ToList();
+            var mappedAgents = _mapper.Map<List<AgentInfo>>(agents);
+
+            return new ListingCaseDetailResponse
+            {
+                Status = ListingCaseDetailStatus.Success,
+                ListingCaseInfo = mappedListingCase,
+                Agents = mappedAgents
+            };
+
+
+        }
 
 
 

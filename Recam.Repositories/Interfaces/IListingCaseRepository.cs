@@ -12,6 +12,8 @@ namespace Recam.Repositories.Interfaces
         Task AddListingCase(ListingCase listingCase);
         Task<List<ListingCase>> GetListingCasesForPhotographyCompany(string userId);
         Task<List<ListingCase>> GetListingCasesForAgent(string userId);
+        Task<ListingCase?> GetListingCaseDetailForPhotographyCompany(string userId, int id);
+        Task<ListingCase?> GetListingCaseDetailForAgent(string userId, int id);
         Task SaveChangesAsync();
     }
 }

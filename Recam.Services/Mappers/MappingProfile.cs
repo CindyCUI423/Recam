@@ -43,6 +43,7 @@ namespace Recam.Services.Mappers
 
             // ListingCase -> ListingCaseDto (when getting listingCase list)
             CreateMap<ListingCase, ListingCaseDto>();
+
         }
     }
 }

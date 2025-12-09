@@ -35,7 +35,7 @@ namespace Recam.API.Controllers
         {
             // Get user id from JWT
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            
+
             var id = await _listingCaseService.CreateListingCase(request, userId);
 
             return StatusCode(StatusCodes.Status201Created, new { listingCaseId = id });
@@ -84,6 +84,51 @@ namespace Recam.API.Controllers
             {
                 return Ok(result);
             }
+        }
+
+        /// <summary>
+        /// Retrieves the details of a listing case identified by the specified ID for the authenticated user
+        /// </summary>
+        /// <remarks>This method requires the caller to be authenticated. Access to the listing case may
+        /// be restricted based on the user's role or permissions.</remarks>
+        /// <param name="id">The unique identifier of the listing case to retrieve. Must be a positive integer.</param>
+        /// <returns>
+        /// Listing case details including associated agents information on success
+        /// </returns>
+        [HttpGet("{id}")]
+        [Authorize]
+        [ProducesResponseType(typeof(ListingCaseDetailResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetListingCaseById(int id)
+        {
+            // Get user id from JWT
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            // Get user's role from JWT
+            var role = User.FindFirstValue(ClaimTypes.Role);
+
+            var result = await _listingCaseService.GetListingCaseById(userId, role, id);
+
+            if (result.Status == ListingCaseDetailStatus.BadRequest)
+            {
+                return BadRequest(
+                       new ErrorResponse(StatusCodes.Status400BadRequest,
+                           result.ErrorMessage ?? "Listing case id must be a positive integer.",
+                           "InvalidId"));
+            }
+            else if (result.Status == ListingCaseDetailStatus.Unauthorized)
+            {
+                return Unauthorized(
+                       new ErrorResponse(StatusCodes.Status401Unauthorized,
+                           result.ErrorMessage ?? "User is not authenticated or invalid user role.",
+                           "Unauthorized"));
+            }
+            else
+            {
+                return Ok(result);
+            }
+
         }
 
 

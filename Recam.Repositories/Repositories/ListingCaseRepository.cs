@@ -40,6 +40,24 @@ namespace Recam.Repositories.Repositories
                 .ToListAsync();
         }
 
+        public async Task<ListingCase?> GetListingCaseDetailForPhotographyCompany(string userId, int id)
+        {
+            return await _dbContext.ListingCases
+                .AsNoTracking()
+                .Include(l => l.AgentListingCases)
+                    .ThenInclude(al => al.Agent)
+                .FirstOrDefaultAsync(l => l.Id == id && l.UserId == userId);
+        }
+
+        public async Task<ListingCase?> GetListingCaseDetailForAgent(string userId, int id)
+        {
+            return await _dbContext.ListingCases
+                .AsNoTracking()
+                .Include(l => l.AgentListingCases)
+                    .ThenInclude(al => al.Agent)
+                .FirstOrDefaultAsync(l => l.Id == id && l.AgentListingCases.Any(a => a.AgentId == userId));
+        }
+
         public async Task SaveChangesAsync()
         {
             await _dbContext.SaveChangesAsync();

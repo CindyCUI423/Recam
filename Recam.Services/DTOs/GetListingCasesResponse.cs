@@ -43,5 +43,7 @@ namespace Recam.Services.DTOs
         public PropertyType PropertyType { get; set; }
         public SaleCategory SaleCategory { get; set; }
         public ListingCaseStatus ListingCaseStatus { get; set; }
+        public string UserId { get; set; }
+
     }
 }
