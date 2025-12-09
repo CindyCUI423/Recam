@@ -19,7 +19,7 @@ namespace Recam.Services.Services
         private readonly ICaseHistoryRepository _caseHistoryRepository;
         private IMapper _mapper;
 
-        public ListingCaseService(IListingCaseRepository listingCaseRepository, ICaseHistoryRepository caseHistoryRepository, 
+        public ListingCaseService(IListingCaseRepository listingCaseRepository, ICaseHistoryRepository caseHistoryRepository,
             IMapper mapper)
         {
             _listingCaseRepository = listingCaseRepository;
@@ -44,6 +44,67 @@ namespace Recam.Services.Services
             await LogListingCaseHistory(listingCase.Id, request.Title, userId);
 
             return listingCase.Id;
+        }
+
+        public async Task<GetListingCasesResponse> GetListingCasesByUser(int pageNumber, int pageSize, string userId, string role)
+        {
+            // If pageNumber or pageSize is invalid
+            if (pageNumber < 1 || pageSize < 1)
+            {
+                return new GetListingCasesResponse
+                {
+                    Status = GetListingCasesStatus.BadRequest,
+                    ErrorMessage = "pageNumber and pageSize must be greater than 0."
+                };
+            }
+
+            // If user is not authenticated
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new GetListingCasesResponse
+                {
+                    Status = GetListingCasesStatus.Unauthorized,
+                    ErrorMessage = "User is not authenticated."
+                };
+            }
+
+            List<ListingCase> cases;
+
+            if (role == "PhotographyCompany")
+            {
+                cases = await _listingCaseRepository.GetListingCasesForPhotographyCompany(userId);
+            }
+            else if (role == "Agent")
+            {
+                cases = await _listingCaseRepository.GetListingCasesForAgent(userId);
+            }
+            // If role is invalid
+            else
+            {
+                return new GetListingCasesResponse
+                {
+                    Status = GetListingCasesStatus.Unauthorized,
+                    ErrorMessage = "Invalid user role."
+                };
+            }
+
+            // Paginate results
+            var totalCount = cases.Count();
+
+            var paginatedCases = cases
+                .OrderByDescending(c => c.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize);
+
+            var mappedCases = _mapper.Map<List<ListingCaseDto>>(paginatedCases); 
+
+            return new GetListingCasesResponse
+            {
+                Status = GetListingCasesStatus.Success,
+                ListingCases = mappedCases,
+                TotalCount = totalCount
+            };
+
         }
 
 

@@ -10,5 +10,6 @@ namespace Recam.Services.Interfaces
     public interface IListingCaseService
     {
         Task<int> CreateListingCase(CreateListingCaseRequest request, string userId);
+        Task<GetListingCasesResponse> GetListingCasesByUser(int pageNumber, int pageSize, string userId, string userrole);
     }
 }

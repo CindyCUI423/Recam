@@ -1,4 +1,5 @@
-﻿using Recam.DataAccess.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Recam.DataAccess.Data;
 using Recam.Models.Entities;
 using Recam.Repositories.Interfaces;
 using System;
@@ -23,9 +24,27 @@ namespace Recam.Repositories.Repositories
             await _dbContext.ListingCases.AddAsync(listingCase);
         }
 
+        public async Task<List<ListingCase>> GetListingCasesForPhotographyCompany(string userId)
+        {
+            return await _dbContext.ListingCases
+                .AsNoTracking()
+                .Where(l => l.UserId == userId && !l.IsDeleted)
+                .ToListAsync();
+        }
+
+        public async Task<List<ListingCase>> GetListingCasesForAgent(string userId)
+        {
+            return await _dbContext.ListingCases
+                .AsNoTracking()
+                .Where(l => l.AgentListingCases.Any(a => a.AgentId == userId) && !l.IsDeleted)
+                .ToListAsync();
+        }
+
         public async Task SaveChangesAsync()
         {
             await _dbContext.SaveChangesAsync();
         }
+
+        
     }
 }

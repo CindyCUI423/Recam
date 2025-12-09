@@ -10,6 +10,8 @@ namespace Recam.Repositories.Interfaces
     public interface IListingCaseRepository
     {
         Task AddListingCase(ListingCase listingCase);
+        Task<List<ListingCase>> GetListingCasesForPhotographyCompany(string userId);
+        Task<List<ListingCase>> GetListingCasesForAgent(string userId);
         Task SaveChangesAsync();
     }
 }

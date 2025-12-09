@@ -28,7 +28,7 @@ namespace Recam.Services.Mappers
             // PhotographyCompany -> PhotographyCompanyInfo
             CreateMap<PhotographyCompany, PhotographyCompanyInfo>();
 
-            // User -> UserDto (used when getting user list)
+            // User -> UserDto (when getting user list)
             CreateMap<User, UserDto>()
                 .ForMember(
                     dest => dest.Role,
@@ -40,6 +40,9 @@ namespace Recam.Services.Mappers
 
             // CreateListingCaseRequest -> ListingCase
             CreateMap<CreateListingCaseRequest, ListingCase>();
+
+            // ListingCase -> ListingCaseDto (when getting listingCase list)
+            CreateMap<ListingCase, ListingCaseDto>();
         }
     }
 }
