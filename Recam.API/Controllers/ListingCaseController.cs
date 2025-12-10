@@ -5,6 +5,7 @@ using Recam.Common.Exceptions;
 using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using System.Security.Claims;
+using static Recam.Services.DTOs.DeleteListingCaseResponse;
 
 namespace Recam.API.Controllers
 {
@@ -27,7 +28,7 @@ namespace Recam.API.Controllers
         /// </returns>
         [HttpPost]
         [Authorize(Policy = "PhotographyCompanyPolicy")]
-        [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(CreateListingCaseResponse), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
@@ -39,7 +40,7 @@ namespace Recam.API.Controllers
 
             var id = await _listingCaseService.CreateListingCase(request, userId);
 
-            return StatusCode(StatusCodes.Status201Created, new { listingCaseId = id });
+            return StatusCode(StatusCodes.Status201Created, new CreateListingCaseResponse { ListingCaseId = id });
         }
 
         /// <summary>
@@ -124,7 +125,6 @@ namespace Recam.API.Controllers
             {
                 return Ok(result);
             }
-
         }
 
         /// <summary>
@@ -164,7 +164,44 @@ namespace Recam.API.Controllers
             else
             {
                 return Ok(result);
+            }
+        }
 
+        /// <summary>
+        /// Deletes the listing case with the specified identifier.
+        /// </summary>
+        /// <remarks>Requires authorization with the 'PhotographyCompanyPolicy'.</remarks>
+        /// <param name="id">The unique identifier of the listing case to delete. Must correspond to an existing listing case.</param>
+        /// <returns>A result indicating the outcome of the delete operation. Returns <see cref="NoContentResult"/> if the
+        /// deletion is successful;
+        /// </returns>
+        [HttpDelete("listings/{id}")]
+        [Authorize(Policy = "PhotographyCompanyPolicy")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> DeleteListingCase(int id)
+        {
+            var result = await _listingCaseService.DeleteListingCase(id, User);
+
+            if (result.Result == DeleteListingCaseResult.InvalidId)
+            {
+                return BadRequest(
+                       new ErrorResponse(StatusCodes.Status400BadRequest,
+                           result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                           "InvalidId"));
+            }
+            else if (result.Result == DeleteListingCaseResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                       new ErrorResponse(StatusCodes.Status403Forbidden,
+                           result.ErrorMessage ?? "You are not allowed to access this listing case.",
+                           "Forbidden"));
+            }
+            else
+            {
+                return NoContent();
             }
         }
 

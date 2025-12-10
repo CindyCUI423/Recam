@@ -57,6 +57,13 @@ namespace Recam.Repositories.Repositories
                 .ExecuteUpdateAsync(setters => setters.SetProperty(l => l.ListingCaseStatus, status));
         }
 
+        public async Task<int> DeleteListingCase(int id)
+        {
+            return await _dbContext.ListingCases
+                .Where(l => l.Id == id)
+                .ExecuteDeleteAsync();
+        }
+
         public async Task SaveChangesAsync()
         {
             await _dbContext.SaveChangesAsync();

@@ -15,6 +15,7 @@ namespace Recam.Repositories.Interfaces
         Task<List<ListingCase>> GetListingCasesForAgent(string userId);
         Task<ListingCase?> GetListingCaseById(int id);
         Task<int> ChangeListingCaseStatus(int id, ListingCaseStatus status);
+        Task<int> DeleteListingCase(int id);
         Task SaveChangesAsync();
     }
 }

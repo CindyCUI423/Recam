@@ -193,7 +193,7 @@ namespace Recam.Services.Services
             }
 
             // Login success
-            var token = JWTGenerator(user, 7);
+            var token = await JWTGenerator(user, 7);
 
             var roles = await _userManager.GetRolesAsync(user);
             var role = roles[0];

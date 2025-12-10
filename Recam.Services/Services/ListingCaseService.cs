@@ -12,6 +12,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using static Recam.Services.DTOs.DeleteListingCaseResponse;
 
 namespace Recam.Services.Services
 {
@@ -194,6 +195,53 @@ namespace Recam.Services.Services
                 oldStatus = currentStatus,
                 newStatus = newStatus
             };
+        }
+
+        public async Task<DeleteListingCaseResponse> DeleteListingCase(int id, ClaimsPrincipal user)
+        {
+            // Get the current listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
+
+            if (listingCase == null)
+            {
+                return new DeleteListingCaseResponse
+                {
+                    Result = DeleteListingCaseResult.InvalidId,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new DeleteListingCaseResponse
+                {
+                    Result = DeleteListingCaseResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this listing case."
+                };
+            }
+
+            var result = await _listingCaseRepository.DeleteListingCase(id);
+            await _listingCaseRepository.SaveChangesAsync();
+
+            // If failed to delete listing case
+            if (result == 0)
+            {
+                throw new Exception("Failed to delete listing case.");
+            }
+            else
+            {
+                // Log listing case deletion on success
+                await LogListingCaseHistory(id, listingCase.Title, "Deletion", null, user.FindFirstValue(ClaimTypes.NameIdentifier));
+            }
+
+            return new DeleteListingCaseResponse
+            {
+                Result = DeleteListingCaseResult.Success
+            };
+
         }
 
         private async Task LogListingCaseHistory(int listingCaseId, string caseTitle, string change, string? description, string userId)

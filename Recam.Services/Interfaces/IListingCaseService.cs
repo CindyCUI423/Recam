@@ -15,5 +15,6 @@ namespace Recam.Services.Interfaces
         Task<GetListingCasesResponse> GetListingCasesByUser(int pageNumber, int pageSize, string userId, string role);
         Task<ListingCaseDetailResponse> GetListingCaseById(int id, ClaimsPrincipal User);
         Task<ChangeListingCaseStatusResponse> ChangeListingCaseStatus(int id, ChangeListingCaseStatusRequest request, ClaimsPrincipal user);
+        Task<DeleteListingCaseResponse> DeleteListingCase(int id, ClaimsPrincipal user);
     }
 }
