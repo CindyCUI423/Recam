@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Recam.Models.Collections;
 using Recam.Models.Entities;
 using Recam.Models.Enums;
@@ -8,6 +9,7 @@ using Recam.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -18,13 +20,15 @@ namespace Recam.Services.Services
         private readonly IListingCaseRepository _listingCaseRepository;
         private readonly ICaseHistoryRepository _caseHistoryRepository;
         private IMapper _mapper;
+        private readonly IAuthorizationService _authorizationService;
 
         public ListingCaseService(IListingCaseRepository listingCaseRepository, ICaseHistoryRepository caseHistoryRepository,
-            IMapper mapper)
+            IMapper mapper, IAuthorizationService authorizationService)
         {
             _listingCaseRepository = listingCaseRepository;
             _caseHistoryRepository = caseHistoryRepository;
             _mapper = mapper;
+            _authorizationService = authorizationService;
         }
 
         public async Task<int> CreateListingCase(CreateListingCaseRequest request, string userId)
@@ -41,7 +45,7 @@ namespace Recam.Services.Services
             await _listingCaseRepository.SaveChangesAsync();
 
             // Log listing case creation
-            await LogListingCaseHistory(listingCase.Id, request.Title, userId);
+            await LogListingCaseHistory(listingCase.Id, request.Title, "Creation", null, userId);
 
             return listingCase.Id;
         }
@@ -97,35 +101,29 @@ namespace Recam.Services.Services
 
         }
 
-        public async Task<ListingCaseDetailResponse> GetListingCaseById(string? userId, string? role, int id)
+        public async Task<ListingCaseDetailResponse> GetListingCaseById(int id, ClaimsPrincipal user)
         {
-            ListingCase? listingCase = null;
+            // Get the current listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
 
-            if (role == "PhotographyCompany")
-            {
-                listingCase = await _listingCaseRepository.GetListingCaseDetailForPhotographyCompany(userId, id);
-            }
-            else if (role == "Agent")
-            {
-                listingCase = await _listingCaseRepository.GetListingCaseDetailForAgent(userId, id);
-            }
-            // If role is invalid
-            else
-            {
-                return new ListingCaseDetailResponse
-                {
-                    Status = ListingCaseDetailStatus.Unauthorized,
-                    ErrorMessage = "Invalid user role."
-                };
-            }
-
-            // Check if listing case exists
             if (listingCase == null)
             {
                 return new ListingCaseDetailResponse
                 {
                     Status = ListingCaseDetailStatus.BadRequest,
                     ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new ListingCaseDetailResponse
+                {
+                    Status = ListingCaseDetailStatus.Forbidden,
+                    ErrorMessage = "You are not allowed to access this listing case."
                 };
             }
 
@@ -143,22 +141,69 @@ namespace Recam.Services.Services
                 ListingCaseInfo = mappedListingCase,
                 Agents = mappedAgents
             };
-
-
         }
 
+        public async Task<ChangeListingCaseStatusResponse> ChangeListingCaseStatus(int id, ChangeListingCaseStatusRequest request, ClaimsPrincipal user)
+        {
+            var newStatus = request.Status;
 
+            // Get the current listing case before changing status
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
 
+            if (listingCase == null)
+            {
+                return new ChangeListingCaseStatusResponse
+                {
+                    Result = ChangeListingCaseStatusResult.InvalidId,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
 
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
 
+            if (!authResult.Succeeded)
+            {
+                return new ChangeListingCaseStatusResponse
+                {
+                    Result = ChangeListingCaseStatusResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this listing case."
+                };
+            }
 
-        private async Task LogListingCaseHistory(int listingCaseId, string caseTitle, string userId)
+            var currentStatus = listingCase.ListingCaseStatus;
+            var title = listingCase.Title;
+
+            var result = await _listingCaseRepository.ChangeListingCaseStatus(id, newStatus);
+            await _listingCaseRepository.SaveChangesAsync();
+
+            // If failed to change status
+            if (result == 0)
+            {
+                throw new Exception("Failed to change listing case status.");
+            }
+            else
+            {
+                // Log listing case status change on success
+                await LogListingCaseHistory(id, title, "StatusUpdate", $"{currentStatus} -> {newStatus}", user.FindFirstValue(ClaimTypes.NameIdentifier));
+            }
+
+            return new ChangeListingCaseStatusResponse
+            {
+                Result = ChangeListingCaseStatusResult.Success,
+                oldStatus = currentStatus,
+                newStatus = newStatus
+            };
+        }
+
+        private async Task LogListingCaseHistory(int listingCaseId, string caseTitle, string change, string? description, string userId)
         {
             var log = new CaseHistory
             {
                 ListingCaseId = listingCaseId,
                 CaseTitle = caseTitle,
-                Change = "Creation",
+                Change = change,
+                Description = description,
                 UserId = userId,
                 OccurredAt = DateTime.Now,
             };
@@ -172,6 +217,8 @@ namespace Recam.Services.Services
                 // TODO: add failure into logger...?
             }
         }
+
+        
     }
 
     

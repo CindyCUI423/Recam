@@ -18,6 +18,6 @@ namespace Recam.Services.DTOs
     {
         Success,
         BadRequest,
-        Unauthorized,
+        Forbidden,
     }
 }

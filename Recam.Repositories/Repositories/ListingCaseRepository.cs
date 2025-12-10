@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Recam.DataAccess.Data;
 using Recam.Models.Entities;
+using Recam.Models.Enums;
 using Recam.Repositories.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -40,22 +41,20 @@ namespace Recam.Repositories.Repositories
                 .ToListAsync();
         }
 
-        public async Task<ListingCase?> GetListingCaseDetailForPhotographyCompany(string userId, int id)
+        public async Task<ListingCase?> GetListingCaseById(int id)
         {
             return await _dbContext.ListingCases
                 .AsNoTracking()
                 .Include(l => l.AgentListingCases)
                     .ThenInclude(al => al.Agent)
-                .FirstOrDefaultAsync(l => l.Id == id && l.UserId == userId);
+                .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
         }
 
-        public async Task<ListingCase?> GetListingCaseDetailForAgent(string userId, int id)
+        public async Task<int> ChangeListingCaseStatus(int id, ListingCaseStatus status)
         {
             return await _dbContext.ListingCases
-                .AsNoTracking()
-                .Include(l => l.AgentListingCases)
-                    .ThenInclude(al => al.Agent)
-                .FirstOrDefaultAsync(l => l.Id == id && l.AgentListingCases.Any(a => a.AgentId == userId));
+                .Where(l => l.Id == id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(l => l.ListingCaseStatus, status));
         }
 
         public async Task SaveChangesAsync()

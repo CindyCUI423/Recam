@@ -1,11 +1,13 @@
 ﻿using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Recam.API.Authorization;
 using Recam.Common.Exceptions;
 using Recam.DataAccess.Collections;
 using Recam.DataAccess.Data;
@@ -154,14 +156,21 @@ public class Program
         builder.Services.AddValidatorsFromAssemblyContaining<SignUpRequestValidator>();
         builder.Services.AddFluentValidationAutoValidation();
 
+        // Register Authorization Handlers
+        builder.Services.AddScoped<IAuthorizationHandler, ListingCaseAccessHandler>();
 
-        // Register Authorization - assign JWT
+        // Register Authorization Policy - assign JWT
         builder.Services.AddAuthorization(options =>
         {
+            // Role-based policies
             options.AddPolicy("PhotographyCompanyPolicy",
                 policy => policy.RequireClaim(ClaimTypes.Role, "PhotographyCompany"));
             options.AddPolicy("AgentPolicy",
                 policy => policy.RequireClaim(ClaimTypes.Role, "Agent"));
+
+            // Resource-based policies
+            options.AddPolicy("ListingCaseAccess",
+                policy => policy.Requirements.Add(new ListingCaseAccessRequirement()));
         });
 
         // Register Authentication - verify JWT

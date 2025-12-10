@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Recam.Common.Exceptions;
 using Recam.Services.DTOs;
@@ -100,15 +101,10 @@ namespace Recam.API.Controllers
         [ProducesResponseType(typeof(ListingCaseDetailResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetListingCaseById(int id)
         {
-            // Get user id from JWT
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            // Get user's role from JWT
-            var role = User.FindFirstValue(ClaimTypes.Role);
-
-            var result = await _listingCaseService.GetListingCaseById(userId, role, id);
+            var result = await _listingCaseService.GetListingCaseById(id, User);
 
             if (result.Status == ListingCaseDetailStatus.BadRequest)
             {
@@ -117,18 +113,59 @@ namespace Recam.API.Controllers
                            result.ErrorMessage ?? "Listing case id must be a positive integer.",
                            "InvalidId"));
             }
-            else if (result.Status == ListingCaseDetailStatus.Unauthorized)
+            else if (result.Status == ListingCaseDetailStatus.Forbidden)
             {
-                return Unauthorized(
-                       new ErrorResponse(StatusCodes.Status401Unauthorized,
-                           result.ErrorMessage ?? "User is not authenticated or invalid user role.",
-                           "Unauthorized"));
+                return StatusCode(StatusCodes.Status403Forbidden,
+                       new ErrorResponse(StatusCodes.Status403Forbidden,
+                           result.ErrorMessage ?? "You are not allowed to access this listing case.",
+                           "Forbidden"));
             }
             else
             {
                 return Ok(result);
             }
 
+        }
+
+        /// <summary>
+        /// Updates the status of a listing case with the specified identifier.
+        /// </summary>
+        /// <remarks>This operation requires authentication. The user must be authorized to modify the
+        /// specified listing case.</remarks>
+        /// <param name="id">The unique identifier of the listing case to update.</param>
+        /// <param name="request">An object containing the new status. Cannot be null.</param>
+        /// <returns>
+        /// Updated status on success
+        /// </returns>
+        [HttpPatch("listings/{id}/status")]
+        [Authorize]
+        [ProducesResponseType(typeof(ChangeListingCaseStatusResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ChangeListingCaseStatus(int id, [FromBody] ChangeListingCaseStatusRequest request)
+        {
+            var result = await _listingCaseService.ChangeListingCaseStatus(id, request, User);
+
+            if (result.Result == ChangeListingCaseStatusResult.InvalidId)
+            {
+                return BadRequest(
+                       new ErrorResponse(StatusCodes.Status400BadRequest,
+                           result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                           "InvalidId"));
+            }
+            else if (result.Result == ChangeListingCaseStatusResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                       new ErrorResponse(StatusCodes.Status403Forbidden,
+                           result.ErrorMessage ?? "You are not allowed to access this listing case.",
+                           "Forbidden"));
+            }
+            else
+            {
+                return Ok(result);
+
+            }
         }
 
 

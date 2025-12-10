@@ -1,4 +1,5 @@
 ﻿using Recam.Models.Entities;
+using Recam.Models.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,8 +13,8 @@ namespace Recam.Repositories.Interfaces
         Task AddListingCase(ListingCase listingCase);
         Task<List<ListingCase>> GetListingCasesForPhotographyCompany(string userId);
         Task<List<ListingCase>> GetListingCasesForAgent(string userId);
-        Task<ListingCase?> GetListingCaseDetailForPhotographyCompany(string userId, int id);
-        Task<ListingCase?> GetListingCaseDetailForAgent(string userId, int id);
+        Task<ListingCase?> GetListingCaseById(int id);
+        Task<int> ChangeListingCaseStatus(int id, ListingCaseStatus status);
         Task SaveChangesAsync();
     }
 }
