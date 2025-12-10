@@ -50,6 +50,12 @@ namespace Recam.Repositories.Repositories
                 .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
         }
 
+        public async Task<int> UpdateListingCase(ListingCase listingCase)
+        {
+            _dbContext.ListingCases.Update(listingCase);
+            return await _dbContext.SaveChangesAsync();
+        }
+
         public async Task<int> ChangeListingCaseStatus(int id, ListingCaseStatus status)
         {
             return await _dbContext.ListingCases

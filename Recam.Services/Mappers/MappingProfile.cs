@@ -44,6 +44,13 @@ namespace Recam.Services.Mappers
             // ListingCase -> ListingCaseDto (when getting listingCase list)
             CreateMap<ListingCase, ListingCaseDto>();
 
+            // UpdateListingCaseRequest <-> ListingCase
+            CreateMap<UpdateListingCaseRequest, ListingCase>()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.UserId, opt => opt.Ignore())
+                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+                .ForMember(dest => dest.IsDeleted, opt => opt.Ignore());
+            CreateMap<ListingCase, UpdateListingCaseRequest>();
         }
     }
 }

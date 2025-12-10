@@ -168,6 +168,43 @@ namespace Recam.API.Controllers
         }
 
         /// <summary>
+        /// Updates the details of an existing listing case with the specified identifier.
+        /// </summary>
+        /// <param name="id">The unique identifier of the listing case to update.</param>
+        /// <param name="request">A full listing case object containing the updated information for the listing case.</param>
+        /// <returns>Returns a 204 No Content response if the update is successful
+        /// </returns>
+        [HttpPut("listings/{id}")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateListingCase(int id, [FromBody] UpdateListingCaseRequest request)
+        {
+            var result = await _listingCaseService.UpdateListingCase(id, request, User);
+
+            if (result.Result == UpdateListingCaseResult.BadRequest)
+            {
+                return BadRequest(
+                       new ErrorResponse(StatusCodes.Status400BadRequest,
+                           result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                           "InvalidId"));
+            }
+            else if (result.Result == UpdateListingCaseResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                       new ErrorResponse(StatusCodes.Status403Forbidden,
+                           result.ErrorMessage ?? "You are not allowed to access this listing case.",
+                           "Forbidden"));
+            }
+            else
+            {
+                return NoContent();
+            }
+        }
+
+        /// <summary>
         /// Deletes the listing case with the specified identifier.
         /// </summary>
         /// <remarks>Requires authorization with the 'PhotographyCompanyPolicy'.</remarks>

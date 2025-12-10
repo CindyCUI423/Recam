@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using static Recam.Services.DTOs.DeleteListingCaseResponse;
 
@@ -141,6 +142,66 @@ namespace Recam.Services.Services
                 Status = ListingCaseDetailStatus.Success,
                 ListingCaseInfo = mappedListingCase,
                 Agents = mappedAgents
+            };
+        }
+
+        public async Task<UpdateListingCaseResponse> UpdateListingCase(int id, UpdateListingCaseRequest request, ClaimsPrincipal user)
+        {
+            // Get the current listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
+
+            if (listingCase == null)
+            {
+                return new UpdateListingCaseResponse
+                {
+                    Result = UpdateListingCaseResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Store the old status before update
+            var oldSnapshot = _mapper.Map<UpdateListingCaseRequest>(listingCase);
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new UpdateListingCaseResponse
+                {
+                    Result = UpdateListingCaseResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this listing case."
+                };
+            }
+
+            // Update the listingCase through AutoMapper
+            _mapper.Map(request, listingCase);
+            var newSnapshot = _mapper.Map<UpdateListingCaseRequest>(listingCase);
+
+            var result = await _listingCaseRepository.UpdateListingCase(listingCase);
+
+            // If failed to update
+            if (result == 0)
+            {
+                throw new Exception("Failed to update listing case.");
+            }
+            else
+            {
+                var change = new
+                {
+                    Old = oldSnapshot,
+                    New = newSnapshot
+                };
+
+                var description = JsonSerializer.Serialize(change, new JsonSerializerOptions { WriteIndented = true });
+
+                // Log listing case status change on success
+                await LogListingCaseHistory(id, listingCase.Title, "Update", description, user.FindFirstValue(ClaimTypes.NameIdentifier));
+            }
+
+            return new UpdateListingCaseResponse
+            {
+                Result = UpdateListingCaseResult.Success
             };
         }
 
