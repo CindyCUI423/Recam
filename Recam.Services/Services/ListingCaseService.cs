@@ -90,7 +90,8 @@ namespace Recam.Services.Services
             var paginatedCases = cases
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize);
+                .Take(pageSize)
+                .ToList();
 
             var mappedCases = _mapper.Map<List<ListingCaseDto>>(paginatedCases); 
 
