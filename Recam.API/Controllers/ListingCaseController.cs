@@ -97,7 +97,7 @@ namespace Recam.API.Controllers
         /// <returns>
         /// Listing case details including associated agents information on success
         /// </returns>
-        [HttpGet("{id}")]
+        [HttpGet("listings/{id}")]
         [Authorize]
         [ProducesResponseType(typeof(ListingCaseDetailResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
