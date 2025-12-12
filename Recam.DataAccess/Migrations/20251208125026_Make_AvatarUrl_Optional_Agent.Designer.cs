@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Recam.DataAccess.Data;
 
@@ -11,9 +12,11 @@ using Recam.DataAccess.Data;
 namespace Recam.DataAccess.Migrations
 {
     [DbContext(typeof(RecamDbContext))]
-    partial class RecamDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251208125026_Make_AvatarUrl_Optional_Agent")]
+    partial class Make_AvatarUrl_Optional_Agent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

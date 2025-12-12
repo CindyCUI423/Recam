@@ -193,7 +193,7 @@ namespace Recam.Services.Services
             }
 
             // Login success
-            var token = JWTGenerator(user, 7);
+            var token = await JWTGenerator(user, 7);
 
             var roles = await _userManager.GetRolesAsync(user);
             var role = roles[0];
@@ -238,16 +238,16 @@ namespace Recam.Services.Services
             return response;
         }
 
-        private string JWTGenerator(User user, int days)
+        private async Task<string> JWTGenerator(User user, int days)
         {
             var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
             };
 
-            var roles = _userManager.GetRolesAsync(user).Result;
+            var roles = await _userManager.GetRolesAsync(user);
 
             foreach (var role in roles)
             {

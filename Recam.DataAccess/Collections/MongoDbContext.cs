@@ -20,5 +20,6 @@ namespace Recam.DataAccess.Collections
         }
 
         public IMongoCollection<UserActivityLog> UserActivityLogs => _database.GetCollection<UserActivityLog>("UserActivityLogs");
+        public IMongoCollection<CaseHistory> CaseHistories => _database.GetCollection<CaseHistory>("CaseHistories");
     }
 }
