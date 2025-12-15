@@ -38,6 +38,15 @@ namespace Recam.API.Controllers
             // Get user id from JWT
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
+            // If userId is null, return Unauthorized
+            if (string.IsNullOrWhiteSpace(null))
+            {
+                return Unauthorized(
+                    new ErrorResponse(StatusCodes.Status401Unauthorized,
+                        "User is not authenticated.",
+                        "InvalidUser"));
+            }
+
             var id = await _listingCaseService.CreateListingCase(request, userId);
 
             return StatusCode(StatusCodes.Status201Created, new CreateListingCaseResponse { ListingCaseId = id });
@@ -62,6 +71,15 @@ namespace Recam.API.Controllers
         {
             // Get user id from JWT
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            // If userId is null, return Unauthorized
+            if (string.IsNullOrWhiteSpace(null))
+            {
+                return Unauthorized(
+                    new ErrorResponse(StatusCodes.Status401Unauthorized,
+                        "User is not authenticated.",
+                        "InvalidUser"));
+            }
 
             // Get user's role from JWT
             var role = User.FindFirstValue(ClaimTypes.Role);
