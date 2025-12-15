@@ -135,7 +135,7 @@ namespace Recam.Services.Services
             // If failed to delete media asset
             if (result == 0)
             {
-                throw new Exception("Failed to delete listing case.");
+                throw new Exception("Failed to delete media asset.");
             }
             else
             {
