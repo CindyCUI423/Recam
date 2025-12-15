@@ -11,7 +11,9 @@ namespace Recam.Repositories.Interfaces
     {
         Task AddMediaAsset(MediaAsset mediaAsset);
         Task<MediaAsset?> GetHeroByListingCaseId(int listingCaseId);
+        Task<MediaAsset?> GetMediaAssetById(int id);
         void UpdateMediaAsset(MediaAsset mediaAsset);
+        Task<int> DeleteMediaAsset(int id);
 
         Task SaveChangesAsync();
     }

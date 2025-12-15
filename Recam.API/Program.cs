@@ -143,6 +143,8 @@ public class Program
         builder.Services.AddScoped<IListingCaseService, ListingCaseService>();
         builder.Services.AddScoped<IMediaAssetRepository, MediaAssetRepository>();
         builder.Services.AddScoped<IMediaAssetService, MediaAssetService>();
+        builder.Services.AddSingleton<IMediaAssetHistoryRepository, MediaAssetHistoryRepository>();
+
 
 
         // Register UnitOfWork to handle transaction
@@ -160,6 +162,7 @@ public class Program
 
         // Register Authorization Handlers
         builder.Services.AddScoped<IAuthorizationHandler, ListingCaseAccessHandler>();
+        builder.Services.AddScoped<IAuthorizationHandler, MediaAssetAccessHandler>();
 
         // Register Authorization Policy - assign JWT
         builder.Services.AddAuthorization(options =>
@@ -173,6 +176,8 @@ public class Program
             // Resource-based policies
             options.AddPolicy("ListingCaseAccess",
                 policy => policy.Requirements.Add(new ListingCaseAccessRequirement()));
+            options.AddPolicy("MediaAssetAccess",
+                policy => policy.Requirements.Add(new MediaAssetAccessRequirement()));
         });
 
         // Register Authentication - verify JWT

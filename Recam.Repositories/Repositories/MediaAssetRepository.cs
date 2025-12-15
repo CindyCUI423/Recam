@@ -23,7 +23,7 @@ namespace Recam.Repositories.Repositories
         {
             await _dbContext.MediaAssets.AddAsync(mediaAsset);
         }
-
+        
         public async Task<MediaAsset?> GetHeroByListingCaseId(int listingCaseId)
         {
             return await _dbContext.MediaAssets
@@ -33,9 +33,26 @@ namespace Recam.Repositories.Repositories
                     !m.IsDeleted);
         }
 
+        public async Task<MediaAsset?> GetMediaAssetById(int id)
+        {
+            return await _dbContext.MediaAssets
+                .AsNoTracking()
+                .Include(m => m.ListingCase)
+                    .ThenInclude(l => l.AgentListingCases)
+                        .ThenInclude(al => al.Agent)
+                .FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+        }
+
         public void UpdateMediaAsset(MediaAsset mediaAsset)
         {
             _dbContext.MediaAssets.Update(mediaAsset);
+        }
+
+        public async Task<int> DeleteMediaAsset(int id)
+        {
+            return await _dbContext.MediaAssets
+                .Where(m => m.Id == id)
+                .ExecuteDeleteAsync();
         }
 
 

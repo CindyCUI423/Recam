@@ -6,10 +6,12 @@ using Recam.Models.Entities;
 using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using System.Security.Claims;
+using static Recam.Services.DTOs.CreateMediaAssetResponse;
+using static Recam.Services.DTOs.DeleteMediaAssetResponse;
 
 namespace Recam.API.Controllers
 {
-    
+
     [ApiController]
     [Route("api/[controller]")]
     public class MediaAssetController : ControllerBase
@@ -41,21 +43,70 @@ namespace Recam.API.Controllers
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> CreateMediaAsset(int id, [FromBody] CreateMediaAssetRequest request)
         {
-            // Get user id from JWT
-            var userId = _userManager.GetUserId(User);
+            var result = await _mediaAssetService.CreateMediaAsset(id, request, User);
 
-            // If userId is null, return Unauthorized
-            if (string.IsNullOrWhiteSpace(userId))
+            if (result.Result == CreateMediaAssetResult.BadRequest)
             {
-                return Unauthorized(new ErrorResponse(
-                    StatusCodes.Status401Unauthorized,
-                    "User cannot found.",
-                    "InvalidUser"));
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                        "InvalidId"));
             }
+            else if (result.Result == CreateMediaAssetResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new ErrorResponse(StatusCodes.Status403Forbidden,
+                        result.ErrorMessage ?? "You are not allowed to create media asset for this listing case.",
+                        "Forbidden"));
+            }
+            else
+            {
+                return StatusCode(StatusCodes.Status201Created, result);
+            }
+        }
 
-            var mediaAssetId = await _mediaAssetService.CreateMediaAsset(id, request, userId);
+        /// <summary>
+        /// Deletes the media asset with the specified identifier.
+        /// </summary>
+        /// <remarks>
+        /// Requires authentication and the PhotographyCompanyPolicy authorization policy.
+        /// Returns a 400 Bad Request if the specified media asset does not exist or the identifier is invalid, a 403
+        /// Forbidden if the user does not have permission to delete the asset, and a 401 Unauthorized if the user is
+        /// not authenticated.
+        /// </remarks>
+        /// <param name="id">The unique identifier of the media asset to delete. Must correspond to an existing media asset.</param>
+        /// <returns>
+        /// A 204 No Content response if the media asset is successfully deleted.
+        /// </returns>
+        [HttpDelete("id")]
+        [Authorize(Policy = "PhotographyCompanyPolicy")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteMediaAsset(int id)
+        {
+            var result = await _mediaAssetService.DeleteMediaAsset(id, User);
 
-            return StatusCode(StatusCodes.Status201Created, new CreateMediaAssetResponse { MediaAssetId = mediaAssetId });
+            if (result.Result == DeleteMediaAssetResult.BadRequest)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "Unable to find the resource. Please provide a valid media asset id.",
+                        "InvalidId"));
+            }
+            else if (result.Result == DeleteMediaAssetResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new ErrorResponse(StatusCodes.Status403Forbidden,
+                        result.ErrorMessage ?? "You are not allowed to access this media asset.",
+                        "Forbidden"));
+            }
+            else
+            {
+                return NoContent();
+            }
         }
     }
 }
