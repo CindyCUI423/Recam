@@ -4,12 +4,9 @@ using System.Security.Claims;
 
 namespace Recam.API.Authorization
 {
-    /// <summary>
-    /// Handles authorization requirements for accessing a listing case based on the user's identity and role.
-    /// </summary>
-    public class ListingCaseAccessHandler: AuthorizationHandler<ListingCaseAccessRequirement, ListingCase>
+    public class MediaAssetAccessHandler : AuthorizationHandler<MediaAssetAccessRequirement, MediaAsset>
     {
-        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ListingCaseAccessRequirement requirement, ListingCase resource)
+        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, MediaAssetAccessRequirement requirement, MediaAsset resource)
         {
             // Check user's authentication status
             if (!context.User.Identity?.IsAuthenticated ?? true)
@@ -28,12 +25,12 @@ namespace Recam.API.Authorization
 
             var canAccess = role switch
             {
-                "PhotographyCompany" =>
+                "PhotographyCompany" => 
                     resource.UserId == userId,
 
                 "Agent" => 
-                    resource.AgentListingCases != null &&
-                    resource.AgentListingCases.Any(al =>
+                    resource.ListingCase.AgentListingCases != null &&
+                    resource.ListingCase.AgentListingCases.Any(al => 
                         al.Agent != null &&
                         al.Agent.Id == userId),
 

@@ -39,7 +39,7 @@ namespace Recam.API.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             // If userId is null, return Unauthorized
-            if (string.IsNullOrWhiteSpace(null))
+            if (string.IsNullOrWhiteSpace(userId))
             {
                 return Unauthorized(
                     new ErrorResponse(StatusCodes.Status401Unauthorized,
@@ -73,7 +73,7 @@ namespace Recam.API.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             // If userId is null, return Unauthorized
-            if (string.IsNullOrWhiteSpace(null))
+            if (string.IsNullOrWhiteSpace(userId))
             {
                 return Unauthorized(
                     new ErrorResponse(StatusCodes.Status401Unauthorized,

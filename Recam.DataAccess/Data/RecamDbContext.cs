@@ -136,6 +136,11 @@ namespace Recam.DataAccess.Data
                     .WithMany(lc => lc.MediaAssets)
                     .HasForeignKey(ma => ma.ListingCaseId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // One Hero MediaAsset per ListingCase
+                b.HasIndex(m => new { m.ListingCaseId, m.IsHero})
+                    .HasFilter("[IsHero] = 1")
+                    .IsUnique();
             });
 
             // User - MediaAsset (1 : N)

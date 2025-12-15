@@ -39,7 +39,6 @@ namespace Recam.Services.DTOs
         public int Garages { get; set; }
         public double FloorArea { get; set; }
         public DateTime CreatedAt { get; set; }
-        public bool IsDeleted { get; set; }
         public PropertyType PropertyType { get; set; }
         public SaleCategory SaleCategory { get; set; }
         public ListingCaseStatus ListingCaseStatus { get; set; }
