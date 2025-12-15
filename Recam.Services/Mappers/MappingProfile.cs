@@ -51,6 +51,9 @@ namespace Recam.Services.Mappers
                 .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
                 .ForMember(dest => dest.IsDeleted, opt => opt.Ignore());
             CreateMap<ListingCase, UpdateListingCaseRequest>();
+
+            // CreateMediaAssetRequest -> MediaAsset
+            CreateMap<CreateMediaAssetRequest, MediaAsset>();
         }
     }
 }

@@ -141,6 +141,8 @@ public class Program
         builder.Services.AddSingleton<ICaseHistoryRepository, CaseHistoryRepository>();
         builder.Services.AddScoped<IListingCaseRepository, ListingCaseRepository>();
         builder.Services.AddScoped<IListingCaseService, ListingCaseService>();
+        builder.Services.AddScoped<IMediaAssetRepository, MediaAssetRepository>();
+        builder.Services.AddScoped<IMediaAssetService, MediaAssetService>();
 
 
         // Register UnitOfWork to handle transaction
