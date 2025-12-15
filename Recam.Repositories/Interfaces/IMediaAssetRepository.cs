@@ -14,7 +14,7 @@ namespace Recam.Repositories.Interfaces
         Task<MediaAsset?> GetMediaAssetById(int id);
         void UpdateMediaAsset(MediaAsset mediaAsset);
         Task<int> DeleteMediaAsset(int id);
-
+        Task<List<MediaAsset>> GetMediaAssetsByListingCaseId(int id);
         Task SaveChangesAsync();
     }
 }

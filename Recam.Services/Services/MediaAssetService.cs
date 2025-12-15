@@ -153,6 +153,44 @@ namespace Recam.Services.Services
 
         }
 
+        public async Task<GetMediaAssetsResponse> GetMediaAssetsByListingCaseId(int id, ClaimsPrincipal user)
+        {
+            // Get the listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
+
+            // Check if the listing case exists
+            if (listingCase == null)
+            {
+                return new GetMediaAssetsResponse
+                {
+                    Result = GetMediaAssetsResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new GetMediaAssetsResponse
+                {
+                    Result = GetMediaAssetsResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this media assets of this listing case."
+                };
+            }
+
+            var assets = await _mediaAssetRepository.GetMediaAssetsByListingCaseId(id);
+
+            var mappedAssets = _mapper.Map<List<MediaAssetDto>>(assets);
+
+            return new GetMediaAssetsResponse
+            {
+                Result = GetMediaAssetsResult.Success,
+                MediaAssets = mappedAssets
+            };
+        }
+
 
 
 

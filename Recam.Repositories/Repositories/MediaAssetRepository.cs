@@ -54,8 +54,14 @@ namespace Recam.Repositories.Repositories
                 .Where(m => m.Id == id)
                 .ExecuteDeleteAsync();
         }
-
-
+        public async Task<List<MediaAsset>> GetMediaAssetsByListingCaseId(int id)
+        {
+            return await _dbContext.MediaAssets
+                .AsNoTracking()
+                .Where(m => m.ListingCaseId == id && !m.IsDeleted)
+                .OrderBy(m => m.MediaType)
+                .ToListAsync();
+        }
 
 
 

@@ -54,6 +54,9 @@ namespace Recam.Services.Mappers
 
             // CreateMediaAssetRequest -> MediaAsset
             CreateMap<CreateMediaAssetRequest, MediaAsset>();
+
+            // MediaAsset -> MediaAssetDto (when getting media asset list)
+            CreateMap<MediaAsset, MediaAssetDto>();
         }
     }
 }

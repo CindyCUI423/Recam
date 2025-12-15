@@ -12,6 +12,7 @@ namespace Recam.Services.Interfaces
     {
         Task<CreateMediaAssetResponse> CreateMediaAsset(int id, CreateMediaAssetRequest request, ClaimsPrincipal user);
         Task<DeleteMediaAssetResponse> DeleteMediaAsset(int id, ClaimsPrincipal user);
+        Task<GetMediaAssetsResponse> GetMediaAssetsByListingCaseId(int id, ClaimsPrincipal user);
 
     }
 }
