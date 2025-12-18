@@ -23,6 +23,11 @@ namespace Recam.Repositories.Repositories
         {
             await _dbContext.MediaAssets.AddAsync(mediaAsset);
         }
+
+        public async Task AddMediaAssets(List<MediaAsset> mediaAssets)
+        {
+            await _dbContext.MediaAssets.AddRangeAsync(mediaAssets);
+        }
         
         public async Task<MediaAsset?> GetHeroByListingCaseId(int listingCaseId)
         {

@@ -1,12 +1,15 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Recam.Common.Exceptions;
 using Recam.Models.Entities;
+using Recam.Models.Enums;
 using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using System.Security.Claims;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
+using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
 
 namespace Recam.API.Controllers
@@ -18,10 +21,65 @@ namespace Recam.API.Controllers
     {
         private IMediaAssetService _mediaAssetService;
         private UserManager<User> _userManager;
-        public MediaAssetController(IMediaAssetService mediaAssetService, UserManager<User> userManager)
+        private IBlobStorageService _blobStorageService;
+        public MediaAssetController(IMediaAssetService mediaAssetService, UserManager<User> userManager, IBlobStorageService blobStorageService)
         {
             _mediaAssetService = mediaAssetService;
             _userManager = userManager;
+            _blobStorageService = blobStorageService;
+        }
+
+        /// <summary>
+        /// Uploads one or more media files to the server and returns the URLs of the uploaded assets.
+        /// </summary>
+        /// <remarks>Only media type Photo supports uploading multiple files in a single request. For
+        /// other media types, the request must contain exactly one file. All files must be non-empty. The user must be
+        /// authorized with the PhotographyCompanyPolicy.</remarks>
+        /// <param name="files">The collection of files to upload. For media type Photo, multiple files are allowed; for other types, only a
+        /// single file is permitted. Each file must have a nonzero length.</param>
+        /// <param name="type">The type of media being uploaded. Determines whether multiple files are allowed.</param>
+        /// <returns>A 201 Created response containing the URLs of the uploaded media assets if the upload is successful;
+        /// otherwise, a 400 Bad Request or an appropriate error response.</returns>
+        [HttpPost("upload")]
+        [Authorize(Policy = "PhotographyCompanyPolicy")]
+        [ProducesResponseType(typeof(UploadMediaAssetsResponse), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UploadMediaAsset([FromForm] List<IFormFile> files, [FromForm] Models.Enums.MediaType type)
+        {
+            if (files == null || files.Count == 0)
+            {
+                return BadRequest(new ErrorResponse(400, "Files can not be null or empty", "InvalidFiles"));
+            }
+
+            // Only photo type allow multiple files upload
+            if (type != Models.Enums.MediaType.Photo && files.Count != 1)
+            {
+                return BadRequest(new ErrorResponse(400, "Only Photo type allows multiple files upload.", "InvalidFilesCount"));
+            }
+
+            List<string> urls = new List<string>();
+
+            foreach (var file in files)
+            {
+                // Ensure file byte count > 0
+                if (file.Length <= 0)
+                {
+                    return BadRequest(new ErrorResponse(400, "Empty file is not allowed.", "InvalidFile"));
+                }
+
+                // Create a unique file name (avoid using the original file name in case there's special/invalid character)
+                var ext = Path.GetExtension(file.FileName);
+                var blobName = $"{Guid.NewGuid():N}{ext}";
+
+                using var stream = file.OpenReadStream(); // File --> Stream
+                var url = await _blobStorageService.Upload(stream, blobName, file.ContentType);
+
+                urls.Add(url);
+            }
+
+            return StatusCode(StatusCodes.Status201Created, new UploadMediaAssetsResponse { Urls = urls });
         }
 
         /// <summary>
@@ -63,6 +121,60 @@ namespace Recam.API.Controllers
             {
                 return StatusCode(StatusCodes.Status201Created, result);
             }
+        }
+
+
+        [HttpPost("listings/{id}/media/batch")]
+        [Authorize(Policy = "PhotographyCompanyPolicy")]
+        [ProducesResponseType(typeof(CreateMediaAssetsBatchResponse), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> CreateMediaAsset(int id, [FromBody] CreateMediaAssetsBatchRequest request)
+        {
+            var result = await _mediaAssetService.CreateMediaAssetsBatch(id, request, User);
+
+            if (result.Result == CreateMediaAssetsBatchResult.BadRequest)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                        "InvalidId"));
+            }
+            else if (result.Result == CreateMediaAssetsBatchResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new ErrorResponse(StatusCodes.Status403Forbidden,
+                        result.ErrorMessage ?? "You are not allowed to create media asset for this listing case.",
+                        "Forbidden"));
+            }
+            else
+            {
+                return StatusCode(StatusCodes.Status201Created, result);
+            }
+        }
+
+
+        /// <summary>
+        /// Returns the specified media asset as a downloadable file stream.
+        /// </summary>
+        /// <remarks>The caller must be authorized to access the requested media asset. If the file does
+        /// not exist or the request is invalid, an error response is returned with details.</remarks>
+        /// <param name="fileName">The name of the media asset file to download. Cannot be null or empty.</param>
+        /// <returns>An <see cref="FileStreamResult"/> containing the requested media asset if found; otherwise, an error
+        /// response.</returns>
+        [HttpGet("download")]
+        [Authorize]
+        [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> DownloadMediaAsset(string fileName)
+        {
+            var (stream, contentType)  = await _blobStorageService.Download(fileName);
+
+            // Stream --> File
+            return File(stream, contentType, fileDownloadName: fileName);
         }
 
         /// <summary>

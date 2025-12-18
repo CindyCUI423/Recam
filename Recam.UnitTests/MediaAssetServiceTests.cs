@@ -81,7 +81,6 @@ namespace Recam.UnitTests
             {
                 MediaType = MediaType.Photo,
                 MediaUrl = "https://www.examplephoto.com.au",
-                IsHero = false,
             };
 
             _mockListingCaseRepository.Setup(r => r.GetListingCaseById(listingCaseId)).ReturnsAsync((ListingCase)null);
@@ -106,7 +105,6 @@ namespace Recam.UnitTests
             {
                 MediaType = MediaType.Photo,
                 MediaUrl = "https://www.examplephoto.com.au",
-                IsHero = false,
             };
 
             var listingCase = new ListingCase
@@ -137,7 +135,7 @@ namespace Recam.UnitTests
         }
 
         [Fact]
-        public async Task CreateMediaAsset_HasAccessAndHero_ResetHeroAndReturnsMediaId()
+        public async Task CreateMediaAsset_HasAccessAndHero_ReturnsMediaId()
         {
             // Arrange
             var listingCaseId = 3;
@@ -146,7 +144,6 @@ namespace Recam.UnitTests
             {
                 MediaType = MediaType.Photo,
                 MediaUrl = "https://www.examplephoto.com.au",
-                IsHero = true,
             };
 
             var listingCase = new ListingCase
@@ -164,29 +161,14 @@ namespace Recam.UnitTests
                 MediaType = MediaType.Photo,
                 MediaUrl = "https://www.examplephoto.com.au",
                 UploadedAt = DateTime.UtcNow,
-                IsSelect = true,
-                IsHero = true,
+                IsSelect = false,
+                IsHero = false,
                 ListingCaseId = 3,
                 UserId = "test-user",
                 IsDeleted = false,
             };
 
             _mockMapper.Setup(m => m.Map<MediaAsset>(request)).Returns(mediaAsset);
-
-            var existingHeroAsset = new MediaAsset
-            {
-                Id = 5,
-                MediaType = MediaType.Photo,
-                MediaUrl = "https://www.examplephoto2.com.au",
-                UploadedAt = DateTime.UtcNow,
-                IsSelect = true,
-                IsHero = true,
-                ListingCaseId = 3,
-                UserId = "test-user",
-                IsDeleted = false,
-            };
-
-            _mockMediaAssetRepository.Setup(r => r.GetHeroByListingCaseId(listingCaseId)).ReturnsAsync(existingHeroAsset);
 
             _mockMediaAssetRepository.Setup(r => r.AddMediaAsset(mediaAsset)).Returns(Task.CompletedTask);
 
@@ -200,12 +182,10 @@ namespace Recam.UnitTests
             // Assert
             Assert.Equal(CreateMediaAssetResult.Success, result.Result);
             Assert.Equal(mediaAsset.Id, result.MediaAssetId);
-            Assert.Equal(false, existingHeroAsset.IsHero); // Verify that the existing hero has been reset
             _mockListingCaseRepository.Verify(r => r.GetListingCaseById(listingCaseId), Times.Once);
             _mockAuthorizationService.Verify(s => s.AuthorizeAsync(_testUser, listingCase, "ListingCaseAccess"), Times.Once);
             _mockMapper.Verify(m => m.Map<MediaAsset>(It.IsAny<CreateMediaAssetRequest>()), Times.Once);
             _mockMediaAssetRepository.Verify(r => r.GetHeroByListingCaseId(listingCaseId), Times.Once);
-            _mockMediaAssetRepository.Verify(r => r.UpdateMediaAsset(existingHeroAsset), Times.Once);
             _mockMediaAssetRepository.Verify(r => r.AddMediaAsset(It.IsAny<MediaAsset>()), Times.Once);
             _mockMediaAssetRepository.Verify(r => r.SaveChangesAsync(), Times.Once);
             _mockMediaAssetHistoryRepo.Verify(r => r.Insert(It.IsAny<MediaAssetHistory>()), Times.Once);

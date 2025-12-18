@@ -21,9 +21,6 @@ namespace Recam.Services.Validators
                 .WithMessage("MediaUrl is required.")
                 .Must(uri => Uri.IsWellFormedUriString(uri, UriKind.Absolute))
                 .WithMessage("MediaUrl must be a valid absolute URL.");
-
-            // No necessary validation for IsHero
-
         }
     }
 }

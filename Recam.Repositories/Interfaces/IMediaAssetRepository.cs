@@ -10,6 +10,7 @@ namespace Recam.Repositories.Interfaces
     public interface IMediaAssetRepository
     {
         Task AddMediaAsset(MediaAsset mediaAsset);
+        Task AddMediaAssets(List<MediaAsset> mediaAssets);
         Task<MediaAsset?> GetHeroByListingCaseId(int listingCaseId);
         Task<MediaAsset?> GetMediaAssetById(int id);
         void UpdateMediaAsset(MediaAsset mediaAsset);

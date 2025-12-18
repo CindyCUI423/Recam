@@ -1,4 +1,6 @@
-﻿using Recam.Services.DTOs;
+﻿using Microsoft.AspNetCore.Http;
+using Recam.Models.Enums;
+using Recam.Services.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +13,7 @@ namespace Recam.Services.Interfaces
     public interface IMediaAssetService
     {
         Task<CreateMediaAssetResponse> CreateMediaAsset(int id, CreateMediaAssetRequest request, ClaimsPrincipal user);
+        Task<CreateMediaAssetsBatchResponse> CreateMediaAssetsBatch(int id, CreateMediaAssetsBatchRequest request, ClaimsPrincipal user);
         Task<DeleteMediaAssetResponse> DeleteMediaAsset(int id, ClaimsPrincipal user);
         Task<GetMediaAssetsResponse> GetMediaAssetsByListingCaseId(int id, ClaimsPrincipal user);
 

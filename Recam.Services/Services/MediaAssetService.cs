@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Recam.Models.Collections;
 using Recam.Models.Entities;
+using Recam.Models.Enums;
 using Recam.Repositories.Interfaces;
 using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
@@ -13,6 +15,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
+using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
 
 namespace Recam.Services.Services
@@ -24,17 +27,20 @@ namespace Recam.Services.Services
         private readonly IMediaAssetHistoryRepository _mediaAssetHistoryRepo;
         private IMapper _mapper;
         private readonly IAuthorizationService _authorizationService;
+        private readonly IUnitOfWork _unitOfWork;
 
         public MediaAssetService(IMediaAssetRepository mediaAssetRepository, 
             IListingCaseRepository listingCaseRepository,
             IMediaAssetHistoryRepository mediaAssetHistoryRepo,
-            IMapper mapper, IAuthorizationService authorizationService)
+            IMapper mapper, IAuthorizationService authorizationService, 
+            IUnitOfWork unitOfWork)
         {
             _mediaAssetRepository = mediaAssetRepository;
             _listingCaseRepository = listingCaseRepository;
             _mediaAssetHistoryRepo = mediaAssetHistoryRepo;
             _mapper = mapper;
             _authorizationService = authorizationService;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<CreateMediaAssetResponse> CreateMediaAsset(int id, CreateMediaAssetRequest request, ClaimsPrincipal user)
@@ -66,25 +72,11 @@ namespace Recam.Services.Services
 
             var mediaAsset = _mapper.Map<MediaAsset>(request);
 
-            // If IsHero is "true", check if there is an existing hero media asset for the listing case
-            if (request.IsHero)
-            {
-                var existingHero = await _mediaAssetRepository.GetHeroByListingCaseId(id);
-
-                if (existingHero != null)
-                {
-                    // If there is an existing hero, set its IsHero property to false first
-                    existingHero.IsHero = false;
-                    _mediaAssetRepository.UpdateMediaAsset(existingHero);
-                }
-
-                mediaAsset.IsHero = true;
-            }
-
             var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
 
             mediaAsset.UploadedAt = DateTime.UtcNow;
             mediaAsset.IsSelect = false;
+            mediaAsset.IsHero = false;
             mediaAsset.ListingCaseId = id;
             mediaAsset.UserId = userId;
             mediaAsset.IsDeleted = false;
@@ -100,6 +92,79 @@ namespace Recam.Services.Services
                 Result = CreateMediaAssetResult.Success,
                 MediaAssetId = mediaAsset.Id
             };
+        }
+
+        public async Task<CreateMediaAssetsBatchResponse> CreateMediaAssetsBatch(int id, CreateMediaAssetsBatchRequest request, ClaimsPrincipal user)
+        {
+            // Cet the listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
+
+            // Check if the listing case exists
+            if (listingCase == null)
+            {
+                return new CreateMediaAssetsBatchResponse
+                {
+                    Result = CreateMediaAssetsBatchResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new CreateMediaAssetsBatchResponse
+                {
+                    Result = CreateMediaAssetsBatchResult.Forbidden,
+                    ErrorMessage = "You are not allowed to create media asset for this listing case."
+                };
+            }
+
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            // Build Media Assets
+            var assets = request.MediaUrls.Select(url => new MediaAsset
+            {
+                MediaType = request.MediaType,
+                MediaUrl = url,
+                UploadedAt = DateTime.UtcNow,
+                IsSelect = false,
+                IsHero = false,
+                ListingCaseId = id,
+                UserId = userId,
+                IsDeleted = false,
+            }).ToList();
+
+            // Transaction
+            await _unitOfWork.BeginTransaction();
+
+            try
+            {
+                await _mediaAssetRepository.AddMediaAssets(assets);
+                await _mediaAssetRepository.SaveChangesAsync();
+
+                await _unitOfWork.Commit();
+
+                // Log the creation of media assets
+                foreach (var asset in assets)
+                {
+                    await LogMediaAssetHistory(asset.Id, asset.MediaUrl, id, listingCase.Title, "Creation", null, userId);
+                }
+
+                var assetIds = assets.Select(asset => asset.Id).ToList();
+
+                return new CreateMediaAssetsBatchResponse
+                {
+                    Result = CreateMediaAssetsBatchResult.Success,
+                    MediaAssetIds = assetIds,
+                };
+            }
+            catch (Exception)
+            {
+                await _unitOfWork.Rollback();
+                throw;
+            }
         }
 
         public async Task<DeleteMediaAssetResponse> DeleteMediaAsset(int id, ClaimsPrincipal user)
@@ -190,8 +255,6 @@ namespace Recam.Services.Services
                 MediaAssets = mappedAssets
             };
         }
-
-
 
 
 
