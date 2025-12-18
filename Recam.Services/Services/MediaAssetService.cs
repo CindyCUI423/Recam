@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.SetHeroMediaResponse;
 
 namespace Recam.Services.Services
 {
@@ -253,6 +254,68 @@ namespace Recam.Services.Services
             {
                 Result = GetMediaAssetsResult.Success,
                 MediaAssets = mappedAssets
+            };
+        }
+
+        public async Task<SetHeroMediaResponse> SetHeroMedia(int listingCaseId, int mediaAssetId, ClaimsPrincipal user)
+        {
+            // Get the listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(listingCaseId);
+
+            // Check if the listing case exists
+            if (listingCase == null)
+            {
+                return new SetHeroMediaResponse
+                {
+                    Result = SetHeroMediaResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            //var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            //if (!authResult.Succeeded)
+            //{
+            //    return new SetHeroMediaResponse
+            //    {
+            //        Result = SetHeroMediaResult.Forbidden,
+            //        ErrorMessage = "You are not allowed to access this media assets of this listing case."
+            //    };
+            //}
+
+            var asset = await _mediaAssetRepository.GetMediaAssetById(mediaAssetId);
+
+            // Verify this media asset belongs to the specified listing case
+            var listingCaseIdResult = asset.ListingCase.Id;
+
+            if (listingCaseIdResult != listingCaseId)
+            {
+                return new SetHeroMediaResponse
+                {
+                    Result = SetHeroMediaResult.BadRequest,
+                    ErrorMessage = $"Media Asset {mediaAssetId} does not belong to the Listing Case {listingCaseId}."
+                };
+            }
+
+            // Reset exsting Hero media if it exists
+            var existingHero = await _mediaAssetRepository.GetHeroByListingCaseId(listingCaseId);
+
+            if (existingHero != null) 
+            {
+                existingHero.IsHero = false;
+                _mediaAssetRepository.UpdateMediaAsset(existingHero);
+            }
+
+            // Set this media asset to Hero
+            asset.IsHero = true;
+            _mediaAssetRepository.UpdateMediaAsset(asset);
+
+            await _mediaAssetRepository.SaveChangesAsync();
+
+            return new SetHeroMediaResponse
+            {
+                Result = SetHeroMediaResult.Success
             };
         }
 

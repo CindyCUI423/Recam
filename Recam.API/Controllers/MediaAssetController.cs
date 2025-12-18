@@ -11,6 +11,7 @@ using System.Security.Claims;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.SetHeroMediaResponse;
 
 namespace Recam.API.Controllers
 {
@@ -264,6 +265,46 @@ namespace Recam.API.Controllers
                 return Ok(result);
             }
 
+        }
+
+        /// <summary>
+        /// Sets the hero (cover) media asset for the specified listing case.
+        /// </summary>
+        /// <remarks>This endpoint is restricted to users with the Agent role. The specified media asset
+        /// must belong to the listing case identified by <paramref name="id"/>. If the operation is not permitted or
+        /// the media asset is invalid, an appropriate error response is returned.</remarks>
+        /// <param name="id">The unique identifier of the listing case for which to set the hero media asset.</param>
+        /// <param name="request">The request containing the ID of the media asset to set as the hero media. Cannot be null.</param>
+        /// <returns>A result indicating the outcome of the operation. Returns a 204 No Content response if successful;
+        /// otherwise, returns a 400 Bad Request or 403 Forbidden response with error details.</returns>
+        [HttpPut("listings/{id}/cover")]
+        [Authorize(Policy = "AgentPolicy")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> SetHeroMedia(int id, [FromBody] SetHeroMediaRequest request)
+        {
+            var result = await _mediaAssetService.SetHeroMedia(id, request.MediaAssetId, User);
+
+            if (result.Result == SetHeroMediaResult.BadRequest)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? $"Unable to find a media asset {request.MediaAssetId} that belongs to listing case {id}.",
+                        "InvalidId"));
+            }
+            else if (result.Result == SetHeroMediaResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new ErrorResponse(StatusCodes.Status403Forbidden,
+                        result.ErrorMessage ?? "You are not allowed to access this media assets of this listing case.",
+                        "Forbidden"));
+            }
+            else
+            {
+                return NoContent();
+            }
         }
     }
 }
