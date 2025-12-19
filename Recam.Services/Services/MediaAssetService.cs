@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.SelectMediaResponse;
 using static Recam.Services.DTOs.SetHeroMediaResponse;
 
 namespace Recam.Services.Services
@@ -273,16 +274,16 @@ namespace Recam.Services.Services
             }
 
             // Check resource-based Authorization
-            //var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
 
-            //if (!authResult.Succeeded)
-            //{
-            //    return new SetHeroMediaResponse
-            //    {
-            //        Result = SetHeroMediaResult.Forbidden,
-            //        ErrorMessage = "You are not allowed to access this media assets of this listing case."
-            //    };
-            //}
+            if (!authResult.Succeeded)
+            {
+                return new SetHeroMediaResponse
+                {
+                    Result = SetHeroMediaResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this media assets of this listing case."
+                };
+            }
 
             var asset = await _mediaAssetRepository.GetMediaAssetById(mediaAssetId);
 
@@ -317,6 +318,113 @@ namespace Recam.Services.Services
             {
                 Result = SetHeroMediaResult.Success
             };
+        }
+
+        public async Task<SelectMediaResponse> SelectMediaBatch(int id, SelectMediaRequest request, ClaimsPrincipal user)
+        {
+            // Get the listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(id);
+
+            // Check if the listing case exists
+            if (listingCase == null)
+            {
+                return new SelectMediaResponse
+                {
+                    Result = SelectMediaResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new SelectMediaResponse
+                {
+                    Result = SelectMediaResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this media assets of this listing case."
+                };
+            }
+
+            var selected = (request.SelectedId ?? new List<int>()).Distinct().ToHashSet();
+            var unselected = (request.UnselectedId ?? new List<int>()).Distinct().ToHashSet();
+
+            var allIds = selected.Union(unselected).ToList();
+
+            // Transaction
+            await _unitOfWork.BeginTransaction();
+
+            try
+            {
+                var assets = await _mediaAssetRepository.GetMediaAssetsByIds(id, allIds);
+
+                if (assets.Count != allIds.Count)
+                {
+                    await _unitOfWork.Rollback();
+
+                    return new SelectMediaResponse
+                    {
+                        Result = SelectMediaResult.BadRequest,
+                        ErrorMessage = "Unable to find the resource. Please provide valid listing case id or media asset id."
+                    };
+                }
+
+                // Check the selected media count is not greater than 10
+                var selectedCount = await _mediaAssetRepository.CountSelectedMediaForListingCase(id);
+
+                var willIncrease = assets.Count(a => selected.Contains(a.Id) && a.IsSelect == false);
+                var willDecrease = assets.Count(a => unselected.Contains(a.Id) && a.IsSelect == true);
+
+                var totalCount = selectedCount - willDecrease + willIncrease;
+
+                if (totalCount > 10)
+                {
+                    await _unitOfWork.Rollback();
+
+                    return new SelectMediaResponse
+                    {
+                        Result = SelectMediaResult.BadRequest,
+                        ErrorMessage = $"You can select up to 10 media assets for a listing case to display. Current selection would become {totalCount}."
+                    };
+                }
+
+                var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Update and save changes
+                foreach (var asset in assets)
+                {
+                    if (selected.Contains(asset.Id))
+                    {
+                        asset.IsSelect = true;
+
+                        // Log the selection event
+                        await LogMediaAssetHistory(asset.Id, asset.MediaUrl, id, listingCase.Title, "Selection", null, userId);
+
+                    }
+
+                    else if (unselected.Contains(asset.Id))
+                    {
+                        asset.IsSelect = false;
+
+                        // Log the unselection event
+                        await LogMediaAssetHistory(asset.Id, asset.MediaUrl, id, listingCase.Title, "Cancel Selection", null, userId);
+                    }
+                }
+
+                await _unitOfWork.Commit();
+
+                return new SelectMediaResponse
+                {
+                    Result = SelectMediaResult.Success
+                };
+
+            }
+            catch (Exception)
+            {
+                await _unitOfWork.Rollback();
+                throw;
+            }
         }
 
 

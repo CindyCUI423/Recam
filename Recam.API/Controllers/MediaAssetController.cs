@@ -11,6 +11,7 @@ using System.Security.Claims;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.SelectMediaResponse;
 using static Recam.Services.DTOs.SetHeroMediaResponse;
 
 namespace Recam.API.Controllers
@@ -305,6 +306,47 @@ namespace Recam.API.Controllers
             {
                 return NoContent();
             }
+        }
+
+        /// <summary>
+        /// Updates the set of selected media assets for the specified listing in a single batch operation.
+        /// </summary>
+        /// <remarks>The total number of selected media assets cannot exceed 10. Only users authorized
+        /// under the 'AgentPolicy' can perform this operation.</remarks>
+        /// <param name="id">The unique identifier of the listing for which the selected media assets are to be updated.</param>
+        /// <param name="request">An object containing the details of the media assets to select. Cannot be null.</param>
+        /// <returns>A status code indicating the result of the operation: 204 (No Content) if successful; 400 (Bad Request) if
+        /// the request is invalid; 401 (Unauthorized) if the user is not authenticated; or 403 (Forbidden) if the user
+        /// does not have permission to modify the listing.</returns>
+        [HttpPatch("listings/{id}/selected-media")]
+        [Authorize(Policy = "AgentPolicy")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> SelectMediaBatch(int id, [FromBody] SelectMediaRequest request)
+        {
+            var result = await _mediaAssetService.SelectMediaBatch(id, request, User);
+
+            if (result.Result == SelectMediaResult.BadRequest)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "Unable to find the resource, or the total selected media assests are more than 10.",
+                        "BadRequest"));
+            }
+            else if (result.Result == SelectMediaResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new ErrorResponse(StatusCodes.Status403Forbidden,
+                        result.ErrorMessage ?? "You are not allowed to access this media assets of this listing case.",
+                        "Forbidden"));
+            }
+            else
+            {
+                return NoContent();
+            }
+
         }
     }
 }
