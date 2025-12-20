@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.GetFinalSelectedMediaResponse;
 using static Recam.Services.DTOs.SelectMediaResponse;
 using static Recam.Services.DTOs.SetHeroMediaResponse;
 
@@ -427,6 +428,43 @@ namespace Recam.Services.Services
             }
         }
 
+        public async Task<GetFinalSelectedMediaResponse> GetFinalSelectedMediaForListingCase(int listingCaseId, ClaimsPrincipal user)
+        {
+            // Get the listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(listingCaseId);
+
+            // Check if the listing case exists
+            if (listingCase == null)
+            {
+                return new GetFinalSelectedMediaResponse
+                {
+                    Result = GetFinalSelectedMediaResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new GetFinalSelectedMediaResponse
+                {
+                    Result = GetFinalSelectedMediaResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this media assets of this listing case."
+                };
+            }
+
+            var assets = await _mediaAssetRepository.GetFinalSelectedMediaForListingCase(listingCaseId);
+
+            var mappedAssets = _mapper.Map<List<MediaAssetDto>>(assets);
+
+            return new GetFinalSelectedMediaResponse
+            {
+                Result = GetFinalSelectedMediaResult.Success,
+                SelectedMediaAssets = mappedAssets,
+            };
+        }
 
 
 

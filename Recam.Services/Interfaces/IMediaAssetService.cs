@@ -18,6 +18,7 @@ namespace Recam.Services.Interfaces
         Task<GetMediaAssetsResponse> GetMediaAssetsByListingCaseId(int id, ClaimsPrincipal user);
         Task<SetHeroMediaResponse> SetHeroMedia(int listingCaseId, int mediaAssetId, ClaimsPrincipal user);
         Task<SelectMediaResponse> SelectMediaBatch(int id, SelectMediaRequest request, ClaimsPrincipal user);
+        Task<GetFinalSelectedMediaResponse> GetFinalSelectedMediaForListingCase(int listingCaseId, ClaimsPrincipal user);
 
     }
 }

@@ -11,6 +11,7 @@ using System.Security.Claims;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.GetFinalSelectedMediaResponse;
 using static Recam.Services.DTOs.SelectMediaResponse;
 using static Recam.Services.DTOs.SetHeroMediaResponse;
 
@@ -345,6 +346,37 @@ namespace Recam.API.Controllers
             else
             {
                 return NoContent();
+            }
+
+        }
+
+        [HttpGet("listings/{id}/final-selection")]
+        [Authorize]
+        [ProducesResponseType(typeof(GetFinalSelectedMediaResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetFinalSelectedMedia(int id)
+        {
+            var result = await _mediaAssetService.GetFinalSelectedMediaForListingCase(id, User);
+
+            if (result.Result == GetFinalSelectedMediaResult.BadRequest)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                        "BadRequest"));
+            }
+            else if (result.Result == GetFinalSelectedMediaResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    new ErrorResponse(StatusCodes.Status403Forbidden,
+                        result.ErrorMessage ?? "You are not allowed to access this media assets of this listing case.",
+                        "Forbidden"));
+            }
+            else
+            {
+                return Ok(result);
             }
 
         }

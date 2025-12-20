@@ -71,6 +71,14 @@ namespace Recam.Repositories.Repositories
                 .CountAsync();
         }
 
+        public async Task<List<MediaAsset>> GetFinalSelectedMediaForListingCase(int listingCaseId)
+        {
+            return await _dbContext.MediaAssets
+                .AsNoTracking()
+                .Where(m => m.ListingCaseId == listingCaseId && m.IsSelect && !m.IsDeleted)
+                .ToListAsync();
+        }
+
         public void UpdateMediaAsset(MediaAsset mediaAsset)
         {
             _dbContext.MediaAssets.Update(mediaAsset);
