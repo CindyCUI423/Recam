@@ -10,6 +10,7 @@ using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.IO.Compression;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -17,6 +18,7 @@ using System.Threading.Tasks;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.DownloadListingCaseMediaZipResponse;
 using static Recam.Services.DTOs.GetFinalSelectedMediaResponse;
 using static Recam.Services.DTOs.SelectMediaResponse;
 using static Recam.Services.DTOs.SetHeroMediaResponse;
@@ -31,12 +33,14 @@ namespace Recam.Services.Services
         private IMapper _mapper;
         private readonly IAuthorizationService _authorizationService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IBlobStorageService _blobStorageService;
 
         public MediaAssetService(IMediaAssetRepository mediaAssetRepository, 
             IListingCaseRepository listingCaseRepository,
             IMediaAssetHistoryRepository mediaAssetHistoryRepo,
             IMapper mapper, IAuthorizationService authorizationService, 
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            IBlobStorageService blobStorageService)
         {
             _mediaAssetRepository = mediaAssetRepository;
             _listingCaseRepository = listingCaseRepository;
@@ -44,6 +48,7 @@ namespace Recam.Services.Services
             _mapper = mapper;
             _authorizationService = authorizationService;
             _unitOfWork = unitOfWork;
+            _blobStorageService = blobStorageService;
         }
 
         public async Task<CreateMediaAssetResponse> CreateMediaAsset(int id, CreateMediaAssetRequest request, ClaimsPrincipal user)
@@ -466,12 +471,158 @@ namespace Recam.Services.Services
             };
         }
 
+        public async Task<DownloadListingCaseMediaZipResponse> DownloadListingCaseMediaZip(int listingCaseId, ClaimsPrincipal user, CancellationToken ct)
+        {
+            // Get the listing case
+            var listingCase = await _listingCaseRepository.GetListingCaseById(listingCaseId);
 
+            // Check if the listing case exists
+            if (listingCase == null)
+            {
+                return new DownloadListingCaseMediaZipResponse
+                {
+                    Result = DownloadZipResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid listing case id."
+                };
+            }
+
+            // Check resource-based Authorization
+            var authResult = await _authorizationService.AuthorizeAsync(user, listingCase, "ListingCaseAccess");
+
+            if (!authResult.Succeeded)
+            {
+                return new DownloadListingCaseMediaZipResponse
+                {
+                    Result = DownloadZipResult.Forbidden,
+                    ErrorMessage = "You are not allowed to access this media assets of this listing case."
+                };
+            }
+
+            var assets = await _mediaAssetRepository.GetMediaAssetsByListingCaseId(listingCaseId);
+
+            var zipTempPath = Path.Combine(Path.GetTempPath(), $"listing-case-{listingCaseId}-media-{Guid.NewGuid():N}.zip"); // Create a temporary path to write zip
+            var zipFileStream = new FileStream(
+                zipTempPath,
+                FileMode.CreateNew,
+                FileAccess.ReadWrite,
+                FileShare.Read,
+                bufferSize: 1024 * 64,
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose
+                );
+
+            // Prepare a list for manifest.txt
+            var manifestLines = new List<string>
+            { 
+                $"GeneratedAtUTC: {DateTime.UtcNow}",
+                $"ListingCaseId: {listingCaseId}",
+                $"TotalAssets: {assets.Count}",
+            };
+
+            // Leave the stream open to return the zip stream to the controller
+            using (var zip = new ZipArchive(zipFileStream, ZipArchiveMode.Create, leaveOpen: true))
+            {
+
+                for (int i = 0; i < assets.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    // Get the blobName from the media url
+                    var blobName = ExtractBlobNameFromUrl(assets[i].MediaUrl);
+
+                    if (string.IsNullOrWhiteSpace(blobName))
+                    {
+                        // Record the skip in the manifest.txt
+                        manifestLines.Add($"[SKIP] Index={i} MediaAssetId={assets[i]} Reason=BlobNameExtractionFailure MediaUrl={assets[i].MediaUrl ?? null}");
+
+                        continue;
+                    }
+
+                    var fileName = $"{i+1:D3}-{SanitizeFileName(Path.GetFileName(blobName))}";
+
+                    try
+                    {
+                        // Download the media asset from Blob Storage
+                        var (blobStream, contentType) = await _blobStorageService.Download(blobName);
+
+                        // Create a media asser file in zip
+                        var entry = zip.CreateEntry(fileName, CompressionLevel.Fastest);
+                        await using (blobStream)
+                        await using (var entryStream = entry.Open())
+                        {
+                            await blobStream.CopyToAsync(entryStream, 1024 * 64, ct);
+                        }
+
+                        // Record the success in the manifest.txt
+                        manifestLines.Add($"[SUCCESS] Index={i} MediaAssetId={assets[i]} MediaUrl={assets[i].MediaUrl}");
+                    }
+                    catch (Exception ex) 
+                    {
+                        // Record the error in the manifest.txt
+                        manifestLines.Add($"[FAIL] Index={i} MediaAssetId={assets[i]} Exception={ex.GetType().Name}: {ex.Message} MediaUrl={assets[i].MediaUrl}");
+
+                        continue;
+                    }
+                }
+
+                // Write the manifest.txt into the zip file
+                var manifestEntry = zip.CreateEntry("manifest.txt", CompressionLevel.Fastest);
+                await using (var manifestStream = manifestEntry.Open())
+                await using (var writer = new StreamWriter(manifestStream, Encoding.UTF8, bufferSize: 1024, leaveOpen: false))
+                {
+                    foreach (var line in manifestLines) 
+                    {
+                        await writer.WriteLineAsync(line);
+                    }
+                }
+            }
+
+            // Reset the pointer to the beginning of the stream, otherwise the downloaded zip will be empty
+            zipFileStream.Position = 0;
+
+            return new DownloadListingCaseMediaZipResponse
+            {
+                Result = DownloadZipResult.Success,
+                ZipStream = zipFileStream,
+                ZipFileName = $"listing-case-{listingCaseId}-media.zip"
+            };
+        }
+
+
+
+        private static string? ExtractBlobNameFromUrl(string url)
+        {
+            // Get uri: "/container-name/blob-name"
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return null;
+            }
+
+            var path = uri.AbsolutePath.Trim('/');
+            var parts = path.Split('/', 2); // can only be split into up to 2 parts
+            if (parts.Length < 2) return null;
+
+            return parts[1]; // parts[0]
+        }
+
+        private static string SanitizeFileName(string fileName)
+        {
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                fileName = fileName.Replace(c, '_');
+            }
+
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = "media_asset";
+            }
+
+            return fileName;
+        }
 
         private async Task LogMediaAssetHistory(
-            int mediaAssetId, 
-            string mediaUrl, 
-            int listingCaseId, 
+            int mediaAssetId,
+            string mediaUrl,
+            int listingCaseId,
             string listingCaseTitle,
             string change,
             string? description,
@@ -500,6 +651,7 @@ namespace Recam.Services.Services
             }
         }
 
-        
+
+
     }
 }

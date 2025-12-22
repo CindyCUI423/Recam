@@ -19,6 +19,7 @@ namespace Recam.Services.Interfaces
         Task<SetHeroMediaResponse> SetHeroMedia(int listingCaseId, int mediaAssetId, ClaimsPrincipal user);
         Task<SelectMediaResponse> SelectMediaBatch(int id, SelectMediaRequest request, ClaimsPrincipal user);
         Task<GetFinalSelectedMediaResponse> GetFinalSelectedMediaForListingCase(int listingCaseId, ClaimsPrincipal user);
+        Task<DownloadListingCaseMediaZipResponse> DownloadListingCaseMediaZip(int listingCaseId, ClaimsPrincipal user, CancellationToken ct);
 
     }
 }

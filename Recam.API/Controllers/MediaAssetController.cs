@@ -11,6 +11,7 @@ using System.Security.Claims;
 using static Recam.Services.DTOs.CreateMediaAssetResponse;
 using static Recam.Services.DTOs.CreateMediaAssetsBatchResponse;
 using static Recam.Services.DTOs.DeleteMediaAssetResponse;
+using static Recam.Services.DTOs.DownloadListingCaseMediaZipResponse;
 using static Recam.Services.DTOs.GetFinalSelectedMediaResponse;
 using static Recam.Services.DTOs.SelectMediaResponse;
 using static Recam.Services.DTOs.SetHeroMediaResponse;
@@ -169,7 +170,7 @@ namespace Recam.API.Controllers
         /// response.</returns>
         [HttpGet("download")]
         [Authorize]
-        [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> DownloadMediaAsset(string fileName)
@@ -350,6 +351,15 @@ namespace Recam.API.Controllers
 
         }
 
+        /// <summary>
+        /// Retrieves the final set of media assets selected for a specified listing case.
+        /// </summary>
+        /// <remarks>Requires authentication. Returns status code 200 with the selected media assets if
+        /// successful, 400 if the request is invalid, 401 if the user is unauthorized, or 403 if access to the listing
+        /// case is forbidden.</remarks>
+        /// <param name="id">The unique identifier of the listing case for which to retrieve the final selected media assets.</param>
+        /// <returns>An <see cref="IActionResult"/> containing a <see cref="GetFinalSelectedMediaResponse"/> with the final
+        /// selected media assets if successful; otherwise, an <see cref="ErrorResponse"/> with details about the error.</returns>
         [HttpGet("listings/{id}/final-selection")]
         [Authorize]
         [ProducesResponseType(typeof(GetFinalSelectedMediaResponse), StatusCodes.Status200OK)]
@@ -380,5 +390,46 @@ namespace Recam.API.Controllers
             }
 
         }
+
+        /// <summary>
+        /// Downloads a ZIP archive containing all media files associated with the specified listing case.
+        /// </summary>
+        /// <remarks>Requires authentication. Returns status code 200 (OK) with the ZIP file on success,
+        /// 400 (Bad Request) if the listing case ID is invalid, 401 (Unauthorized) if the user is not authenticated, or
+        /// 403 (Forbidden) if the user does not have access to the listing case.</remarks>
+        /// <param name="id">The unique identifier of the listing case whose media files are to be downloaded.</param>
+        /// <param name="ct">A cancellation token that can be used to cancel the operation.</param>
+        /// <returns>An HTTP response containing the ZIP file of media assets if successful; otherwise, an error response with
+        /// the appropriate status code.</returns>
+        [HttpGet("listing/{id}/media-zip")]
+        [Authorize]
+        [Produces("application/zip")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> DownloadListingCaseMediaZip(int id, CancellationToken ct)
+        {
+            var result = await _mediaAssetService.DownloadListingCaseMediaZip(id, User, ct);
+
+            if (result.Result == DownloadZipResult.BadRequest)
+            {
+                return BadRequest(new ErrorResponse(
+                    StatusCodes.Status400BadRequest,
+                    result.ErrorMessage ?? "Unable to find the resource. Please provide a valid listing case id.",
+                    "InvalidId"));
+            }
+
+            if (result.Result == DownloadZipResult.Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse(
+                    StatusCodes.Status403Forbidden,
+                    result.ErrorMessage ?? "You are not allowed to access this listing case.",
+                    "Forbidden"));
+            }
+
+            return File(result.ZipStream!, "application/zip", result.ZipFileName ?? $"listing-{id}-media.zip");
+        }
+    
     }
 }
