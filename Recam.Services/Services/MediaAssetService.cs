@@ -202,6 +202,18 @@ namespace Recam.Services.Services
                 };
             }
 
+            // Get the blob name
+            var blobName = ExtractBlobNameFromUrl(media.MediaUrl);
+            if (string.IsNullOrWhiteSpace(blobName))
+            {
+                return new DeleteMediaAssetResponse
+                {
+                    Result = DeleteMediaAssetResult.Error,
+                    ErrorMessage = "Unable to extract the valid blob name from media url."
+                };
+            }
+
+            // Delete from DB
             var result = await _mediaAssetRepository.DeleteMediaAsset(id);
             await _mediaAssetRepository.SaveChangesAsync();
 
@@ -217,6 +229,21 @@ namespace Recam.Services.Services
                 
                 // Log media asset deletion on success
                 await LogMediaAssetHistory(media.Id, media.MediaUrl, media.ListingCaseId, listingCaseTitle, "Deletion", null, userId);
+            }
+
+            try
+            {
+                // Delete from Blob Storage
+                var deleted = await _blobStorageService.Delete(blobName);
+
+                // TODO: logger
+                // if (!deleted) means the blob not found...log this event
+            }
+            catch (Exception ex)
+            {
+                // TODO: logger
+                // do not throw the exception --> do not make this API request failed
+                // log this event
             }
 
             return new DeleteMediaAssetResponse

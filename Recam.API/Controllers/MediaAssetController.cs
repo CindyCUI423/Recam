@@ -127,7 +127,18 @@ namespace Recam.API.Controllers
             }
         }
 
-
+        /// <summary>
+        /// Creates a batch of media assets for the specified listing case.
+        /// </summary>
+        /// <remarks>Requires the caller to be authorized under the PhotographyCompanyPolicy. Returns 400
+        /// Bad Request if the listing case ID is invalid, 403 Forbidden if the user is not permitted to create media
+        /// assets for the specified listing, and 500 Internal Server Error for unexpected failures.</remarks>
+        /// <param name="id">The unique identifier of the listing case for which media assets are to be created. Must correspond to an
+        /// existing listing case.</param>
+        /// <param name="request">The request payload containing details of the media assets to be created. Cannot be null.</param>
+        /// <returns>An <see cref="IActionResult"/> that represents the result of the operation. Returns a 201 Created response
+        /// with the batch creation result if successful; otherwise, returns an error response with the appropriate
+        /// status code.</returns>
         [HttpPost("listings/{id}/media/batch")]
         [Authorize(Policy = "PhotographyCompanyPolicy")]
         [ProducesResponseType(typeof(CreateMediaAssetsBatchResponse), StatusCodes.Status201Created)]
@@ -135,7 +146,7 @@ namespace Recam.API.Controllers
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> CreateMediaAsset(int id, [FromBody] CreateMediaAssetsBatchRequest request)
+        public async Task<IActionResult> CreateMediaAssetsBatch(int id, [FromBody] CreateMediaAssetsBatchRequest request)
         {
             var result = await _mediaAssetService.CreateMediaAssetsBatch(id, request, User);
 
@@ -186,7 +197,7 @@ namespace Recam.API.Controllers
         /// </summary>
         /// <remarks>
         /// Requires authentication and the PhotographyCompanyPolicy authorization policy.
-        /// Returns a 400 Bad Request if the specified media asset does not exist or the identifier is invalid, a 403
+        /// Returns a 400 Bad Request if the specified media asset does not exist or the blob name can not be found, a 403
         /// Forbidden if the user does not have permission to delete the asset, and a 401 Unauthorized if the user is
         /// not authenticated.
         /// </remarks>
@@ -218,6 +229,13 @@ namespace Recam.API.Controllers
                     new ErrorResponse(StatusCodes.Status403Forbidden,
                         result.ErrorMessage ?? "You are not allowed to access this media asset.",
                         "Forbidden"));
+            }
+            else if (result.Result == DeleteMediaAssetResult.Error)
+            {
+                return BadRequest(
+                    new ErrorResponse(StatusCodes.Status400BadRequest,
+                        result.ErrorMessage ?? "Unable to extract the valid blob name from media url.",
+                        "BlobNameNotFound"));
             }
             else
             {
@@ -430,6 +448,8 @@ namespace Recam.API.Controllers
 
             return File(result.ZipStream!, "application/zip", result.ZipFileName ?? $"listing-{id}-media.zip");
         }
+
     
     }
+    
 }

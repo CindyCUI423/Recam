@@ -10,6 +10,6 @@ namespace Recam.Services.Interfaces
     {
         Task<string> Upload(Stream fileStream, string fileName, string contentType);
         Task<(Stream Stream, string ContentType)> Download(string fileName);
-        Task Delete(string fileName);
+        Task<bool> Delete(string fileName);
     }
 }

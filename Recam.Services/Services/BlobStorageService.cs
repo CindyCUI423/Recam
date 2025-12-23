@@ -59,7 +59,7 @@ namespace Recam.Services.Services
             return (response.Value.Content, props.Value.ContentType ?? "application/octet-stream");
         }
 
-        public async Task Delete(string fileName)
+        public async Task<bool> Delete(string fileName)
         {
             // Get the container
             var containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
@@ -67,7 +67,12 @@ namespace Recam.Services.Services
             // Get the blob using the file url
             var blobClient = containerClient.GetBlobClient(fileName);
 
-            await blobClient.DeleteAsync();
+            var response = await blobClient.DeleteIfExistsAsync(
+                snapshotsOption: DeleteSnapshotsOption.IncludeSnapshots,
+                conditions: null
+                );
+
+            return response.Value;
         }
     }
 }

@@ -29,6 +29,8 @@ namespace Recam.UnitTests
         private Mock<IListingCaseRepository> _mockListingCaseRepository;
         private Mock<IMediaAssetHistoryRepository> _mockMediaAssetHistoryRepo;
         private Mock<IMapper> _mockMapper;
+        private Mock<IUnitOfWork> _mockUnitOfWork;
+        private Mock<IBlobStorageService> _mockBlobStorageService;
         private Mock<IAuthorizationService> _mockAuthorizationService;
         private readonly ClaimsPrincipal _testUser;
 
@@ -55,6 +57,10 @@ namespace Recam.UnitTests
                                                      "ListingCaseAccess"))
                                      .ReturnsAsync(AuthorizationResult.Success());
 
+            _mockUnitOfWork = new Mock<IUnitOfWork>();
+
+            _mockBlobStorageService = new Mock<IBlobStorageService>();
+
             _testUser = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
                 {
                     new Claim(ClaimTypes.NameIdentifier, "test-user")
@@ -65,7 +71,9 @@ namespace Recam.UnitTests
                 _mockListingCaseRepository.Object,
                 _mockMediaAssetHistoryRepo.Object,
                 _mockMapper.Object,
-                _mockAuthorizationService.Object
+                _mockAuthorizationService.Object,
+                _mockUnitOfWork.Object,
+                _mockBlobStorageService.Object
                 );
         }
 
