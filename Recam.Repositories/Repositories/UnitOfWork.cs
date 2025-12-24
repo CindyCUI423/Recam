@@ -25,9 +25,13 @@ namespace Recam.Repositories.Repositories
 
         public async Task Commit()
         {
+            await _dbContext.SaveChangesAsync();
+
             if (_transaction != null)
             {
                 await _transaction.CommitAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
             }
         }
 
@@ -36,6 +40,8 @@ namespace Recam.Repositories.Repositories
             if (_transaction != null)
             {
                 await _transaction.RollbackAsync();
+                await _transaction.DisposeAsync();
+                _transaction = null;
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using Azure.Storage.Blobs;
+using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -117,6 +118,11 @@ public class Program
 
         builder.Services.AddSingleton<MongoDbContext>();
 
+        // Register Blob Storage Client Service
+        builder.Services.AddSingleton(x => new BlobServiceClient(
+            builder.Configuration.GetSection("AzureBlobStorage")["ConnectionString"])
+        );
+
         // Regiester Identity, UserManager
         builder.Services.AddIdentity<User, Role>(options =>
         {
@@ -144,7 +150,7 @@ public class Program
         builder.Services.AddScoped<IMediaAssetRepository, MediaAssetRepository>();
         builder.Services.AddScoped<IMediaAssetService, MediaAssetService>();
         builder.Services.AddSingleton<IMediaAssetHistoryRepository, MediaAssetHistoryRepository>();
-
+        builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 
 
         // Register UnitOfWork to handle transaction

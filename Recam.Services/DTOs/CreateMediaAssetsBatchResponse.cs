@@ -6,16 +6,17 @@ using System.Threading.Tasks;
 
 namespace Recam.Services.DTOs
 {
-    public class DeleteMediaAssetResponse
+    public class CreateMediaAssetsBatchResponse
     {
-        public DeleteMediaAssetResult Result { get; set; }
+        public CreateMediaAssetsBatchResult Result { get; set; }
         public string? ErrorMessage { get; set; }
-        public enum DeleteMediaAssetResult
+        public List<int>? MediaAssetIds { get; set; }
+
+        public enum CreateMediaAssetsBatchResult
         {
             Success,
             BadRequest,
-            Forbidden,
-            Error
+            Forbidden
         }
     }
 }
