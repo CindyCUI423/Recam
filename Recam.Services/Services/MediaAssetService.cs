@@ -152,13 +152,13 @@ namespace Recam.Services.Services
                 await _mediaAssetRepository.AddMediaAssets(assets);
                 await _mediaAssetRepository.SaveChangesAsync();
 
-                await _unitOfWork.Commit();
-
                 // Log the creation of media assets
                 foreach (var asset in assets)
                 {
                     await LogMediaAssetHistory(asset.Id, asset.MediaUrl, id, listingCase.Title, "Creation", null, userId);
                 }
+
+                await _unitOfWork.Commit();
 
                 var assetIds = assets.Select(asset => asset.Id).ToList();
 
@@ -320,8 +320,17 @@ namespace Recam.Services.Services
 
             var asset = await _mediaAssetRepository.GetMediaAssetById(mediaAssetId);
 
+            if (asset == null)
+            {
+                return new SetHeroMediaResponse
+                {
+                    Result = SetHeroMediaResult.BadRequest,
+                    ErrorMessage = "Unable to find the resource. Please provide a valid media asset id."
+                };
+            }
+
             // Verify this media asset belongs to the specified listing case
-            var listingCaseIdResult = asset.ListingCase.Id;
+            var listingCaseIdResult = asset.ListingCaseId;
 
             if (listingCaseIdResult != listingCaseId)
             {
