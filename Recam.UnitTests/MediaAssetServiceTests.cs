@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
 using Azure;
+using Castle.Core.Logging;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Recam.Models.Collections;
 using Recam.Models.Entities;
@@ -39,6 +41,7 @@ namespace Recam.UnitTests
         private Mock<IUnitOfWork> _mockUnitOfWork;
         private Mock<IBlobStorageService> _mockBlobStorageService;
         private Mock<IAuthorizationService> _mockAuthorizationService;
+        private Mock<ILogger<MediaAssetService>> _mockLogger;
         private readonly ClaimsPrincipal _testUser;
 
         public MediaAssetServiceTests()
@@ -68,6 +71,8 @@ namespace Recam.UnitTests
 
             _mockBlobStorageService = new Mock<IBlobStorageService>();
 
+            _mockLogger = new Mock<ILogger<MediaAssetService>>();
+
             _testUser = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
                 {
                     new Claim(ClaimTypes.NameIdentifier, "test-user")
@@ -80,7 +85,8 @@ namespace Recam.UnitTests
                 _mockMapper.Object,
                 _mockAuthorizationService.Object,
                 _mockUnitOfWork.Object,
-                _mockBlobStorageService.Object
+                _mockBlobStorageService.Object,
+                _mockLogger.Object
                 );
         }
 

@@ -2,6 +2,7 @@
 using DnsClient.Internal;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Recam.Models.Collections;
 using Recam.Models.Entities;
@@ -28,6 +29,7 @@ namespace Recam.UnitTests
         private Mock<UserManager<User>> _mockUserManager;
         private Mock<SignInManager<User>> _mockSignInManager;
         private Mock<IUnitOfWork> _mockUnitOfWork;
+        private Mock<ILogger<AuthService>> _mockLogger;
 
         public AuthServiceTests()
         {
@@ -56,6 +58,8 @@ namespace Recam.UnitTests
             _mockUnitOfWork.Setup(u => u.Commit()).Returns(Task.CompletedTask);
             _mockUnitOfWork.Setup(u => u.Rollback()).Returns(Task.CompletedTask);
 
+            _mockLogger = new Mock<ILogger<AuthService>>();
+
             _authService = new AuthService(
                 _mockAuthRepo.Object, 
                 _mockUserActivityLogRepo.Object, 
@@ -63,7 +67,8 @@ namespace Recam.UnitTests
                 _mockMapper.Object, 
                 _mockUserManager.Object, 
                 _mockSignInManager.Object, 
-                _mockUnitOfWork.Object);
+                _mockUnitOfWork.Object,
+                _mockLogger.Object);
         }
 
         [Fact]

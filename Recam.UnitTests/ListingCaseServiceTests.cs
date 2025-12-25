@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
+using Castle.Core.Logging;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Recam.Models.Collections;
 using Recam.Models.Entities;
@@ -27,6 +29,7 @@ namespace Recam.UnitTests
         private Mock<ICaseHistoryRepository> _mockCaseHistoryRepo;
         private Mock<IMapper> _mockMapper;
         private Mock<IAuthorizationService> _mockAuthService;
+        private Mock<ILogger<ListingCaseService>> _mockLogger;
         private readonly ClaimsPrincipal _testUser;
 
         public ListingCaseServiceTests()
@@ -46,6 +49,8 @@ namespace Recam.UnitTests
                                             "ListingCaseAccess"))
                             .ReturnsAsync(AuthorizationResult.Success());
 
+            _mockLogger = new Mock<ILogger<ListingCaseService>>();
+
             _testUser = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
                 {
                     new Claim(ClaimTypes.NameIdentifier, "test-user")
@@ -55,7 +60,8 @@ namespace Recam.UnitTests
                 _mockListingCaseRepo.Object,
                 _mockCaseHistoryRepo.Object,
                 _mockMapper.Object,
-                _mockAuthService.Object
+                _mockAuthService.Object,
+                _mockLogger.Object
                 );
         }
 
