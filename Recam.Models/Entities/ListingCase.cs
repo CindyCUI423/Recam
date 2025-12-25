@@ -32,7 +32,6 @@ namespace Recam.Models.Entities
         public PropertyType PropertyType { get; set; }
         public SaleCategory SaleCategory { get; set; }
         public ListingCaseStatus ListingCaseStatus { get; set; }
-
         [ForeignKey(nameof(User))]
         public string UserId { get; set; }
         public ICollection<AgentListingCase> AgentListingCases { get; set; } = new List<AgentListingCase>();

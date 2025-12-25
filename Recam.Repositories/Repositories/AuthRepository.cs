@@ -34,6 +34,26 @@ namespace Recam.Repositories.Repositories
             return await _dbContext.Agents.FindAsync(userId);
         }
 
+        public async Task<List<int>?> GetAssignedListingCaseIds(string userId)
+        {
+            return await _dbContext.AgentListingCases
+                .AsNoTracking()
+                .Where(a => a.AgentId == userId)
+                .Select(a => a.ListingCaseId)
+                .Distinct()
+                .ToListAsync();
+        }
+
+        public async Task<List<int>?> GetAssociatedListingCaseIds(string userId)
+        {
+            return await _dbContext.ListingCases
+                .AsNoTracking()
+                .Where(l => l.UserId == userId)
+                .Select(l => l.Id)
+                .Distinct()
+                .ToListAsync();
+        }
+
         public async Task<PhotographyCompany?> GetPhotographyCompanyByUserId(string userId)
         {
             return await _dbContext.PhotographyCompanies.FindAsync(userId);

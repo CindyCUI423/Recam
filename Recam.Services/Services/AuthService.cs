@@ -21,6 +21,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using static Recam.Services.DTOs.GetCurrentUserInfoResponse;
 using Role = Recam.Models.Entities.Role;
 
 namespace Recam.Services.Services
@@ -396,6 +397,59 @@ namespace Recam.Services.Services
             };
         }
 
+        public async Task<GetCurrentUserInfoResponse> GetCurrentUserInfo(ClaimsPrincipal user)
+        {
+            // Get the user id
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                _logger.LogWarning("Unable to find the user id due to user id claim missing.");
+                
+                return new GetCurrentUserInfoResponse
+                {
+                    Result = GetCurrentUserInfoResult.UserNotFound,
+                    ErrorMessage = "Unable to find the user id due to user id claim missing."
+                };
+            }
+
+            // Get the user role
+            var role = user.FindFirstValue(ClaimTypes.Role);
+
+
+            _logger.LogInformation(
+                  "Start retrieving the current user information. UserId={UserId}, Role={Role}",
+                  userId,
+                  role);
+
+            // Get assigned listing case ids
+            var listingIds = new List<int>();
+
+            if (role == "Agent")
+            {
+                listingIds = await _authRepository.GetAssignedListingCaseIds(userId);
+            }
+            else if (role == "PhotographyCompany")
+            {
+                listingIds = await _authRepository.GetAssociatedListingCaseIds(userId);
+            }
+
+            _logger.LogInformation(
+                "GetCurrentUserInfo completed. UserId={UserId}, Role={Role}, ListingCaseIds={ListingCaseIds}",
+                userId,
+                role,
+                listingIds);
+
+            return new GetCurrentUserInfoResponse
+            {
+                Result = GetCurrentUserInfoResult.Success,
+                Id = userId,
+                Role = role,
+                ListingCaseIds = listingIds
+            };
+
+        }
+
         private async Task LogUserActivity(string? userId, string? userName, string email, string action, bool result, string? message)
         {
             var log = new UserActivityLog
@@ -425,5 +479,7 @@ namespace Recam.Services.Services
                 );
             }
         }
+
+        
     }
 }

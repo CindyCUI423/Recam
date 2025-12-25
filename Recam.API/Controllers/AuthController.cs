@@ -1,11 +1,13 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Recam.Services.DTOs;
-using Recam.Models.Entities;
-using Recam.Services.Interfaces;
-using AutoMapper;
-using Recam.Common.Exceptions;
+﻿using AutoMapper;
+using Azure;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Recam.Common.Exceptions;
+using Recam.Models.Entities;
+using Recam.Services.DTOs;
+using Recam.Services.Interfaces;
+using static Recam.Services.DTOs.GetCurrentUserInfoResponse;
 
 namespace Recam.API.Controllers
 {
@@ -141,6 +143,33 @@ namespace Recam.API.Controllers
             }
             
         }
-        
+
+        /// <summary>
+        /// Retrieves information about the currently authenticated user.
+        /// </summary>
+        /// <remarks>This endpoint requires authentication. The response includes user details including user id, user role, 
+        /// and assoiciated listing case ids (for photography company) or assigned listing case ids (for agent). 
+        /// If the user cannot be determined from the authentication
+        /// context, the request is rejected as unauthorized.</remarks>
+        /// <returns>An <see cref="IActionResult"/> containing the current user's information with status code 200 (OK) if the
+        /// user is found; otherwise, a 401 (Unauthorized) response with an error message if the user cannot be
+        /// identified.</returns>
+        [HttpGet("users/me")]
+        [Authorize]
+        [ProducesResponseType(typeof(GetCurrentUserInfoResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetCurrentUserInfo()
+        {
+            var result = await _authService.GetCurrentUserInfo(User);
+
+            if (result.Result == GetCurrentUserInfoResult.UserNotFound)
+            {
+                return Unauthorized(new ErrorResponse(401, result.ErrorMessage ?? "Unable to find the user id due to user id claim missing.", "UserNotFound"));
+            }
+            else
+            {
+                return Ok(result);
+            }
+        }
     }
 }

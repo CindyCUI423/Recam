@@ -15,5 +15,7 @@ namespace Recam.Repositories.Interfaces
         Task<PhotographyCompany?> GetPhotographyCompanyByUserId(string userId);
         Task<List<User>> GetUsersPaginated(int pageNumber, int pageSize);
         Task<int> GetUsersTotal();
+        Task<List<int>?> GetAssociatedListingCaseIds(string userId);
+        Task<List<int>?> GetAssignedListingCaseIds(string userId);
     }
 }
