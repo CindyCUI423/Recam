@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
+using DnsClient.Internal;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.IdentityModel.Tokens;
 using Recam.Common.Exceptions;
@@ -12,6 +14,7 @@ using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -32,11 +35,12 @@ namespace Recam.Services.Services
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(IAuthRepository authRepository, IUserActivityLogRepository userActivityLogRepository,
             IConfiguration configuration, IMapper mapper,
             UserManager<User> userManager, SignInManager<User> signInManager,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork, ILogger<AuthService> logger)
         {
             _authRepository = authRepository;
             _userActivityLogRepository = userActivityLogRepository;
@@ -45,10 +49,16 @@ namespace Recam.Services.Services
             _userManager = userManager;
             _signInManager = signInManager;
             _unitOfWork = unitOfWork;
+            _logger = logger;
         }
 
         public async Task<SignUpResponse> SignUp(SignUpRequest request)
         {
+            _logger.LogInformation(
+                "Start signing up new user. UserName={UserName}, Email={Email}",
+                request.UserName,
+                request.Email);
+            
             await _unitOfWork.BeginTransaction();
 
             var roleType = request.RoleType.Trim();
@@ -59,6 +69,10 @@ namespace Recam.Services.Services
                 var existingByName = await _userManager.FindByNameAsync(request.UserName);
                 if (existingByName != null)
                 {
+                    _logger.LogWarning(
+                        "Failed to sign up new user because user name already exists. UserName={UserName}",
+                        request.UserName);
+
                     return new SignUpResponse
                     {
                         Status = SignUpStatus.UserNameAlreadyExists,
@@ -70,6 +84,10 @@ namespace Recam.Services.Services
                 var existingByEmail = await _userManager.FindByEmailAsync(request.Email);
                 if (existingByEmail != null)
                 {
+                    _logger.LogWarning(
+                        "Failed to sign up new user because emial already exists. Email={Email}",
+                        request.Email);
+
                     return new SignUpResponse
                     {
                         Status = SignUpStatus.EmailAlreadyExists,
@@ -82,6 +100,11 @@ namespace Recam.Services.Services
                 user.IsDeleted = false;
                 user.CreatedAt = DateTime.UtcNow;
 
+                _logger.LogInformation(
+                    "Persisting new user. UserName={UserName}, Email={Email}",
+                    request.UserName,
+                    request.Email);
+
                 var result = await _userManager.CreateAsync(user, request.Password);
                 if (!result.Succeeded)
                 {
@@ -89,6 +112,11 @@ namespace Recam.Services.Services
                     var message = string.Join(";", result.Errors.Select(e => e.Description));
 
                     await _unitOfWork.Rollback();
+
+                    _logger.LogError(
+                        "Failed to create new user through User Manager. UserName={UserName}, Email={Email}",
+                        request.UserName,
+                        request.Email);
 
                     return new SignUpResponse
                     {
@@ -103,6 +131,11 @@ namespace Recam.Services.Services
                     var agent = _mapper.Map<Agent>(request.AgentInfo);
                     agent.Id = user.Id;
 
+                    _logger.LogInformation(
+                        "Creating the agent for the new user. UserName={UserName}, Email={Email}",
+                        request.UserName,
+                        request.Email);
+
                     await _authRepository.AddAgent(agent);
                 }
 
@@ -110,6 +143,11 @@ namespace Recam.Services.Services
                 {
                     var photograhyCompany = _mapper.Map<PhotographyCompany>(request.PhotographyCompanyInfo);
                     photograhyCompany.Id = user.Id;
+
+                    _logger.LogInformation(
+                        "Creating the photography company for the new user. UserName={UserName}, Email={Email}",
+                        request.UserName,
+                        request.Email);
 
                     await _authRepository.AddPhotographyCompany(photograhyCompany);
                 }
@@ -121,6 +159,12 @@ namespace Recam.Services.Services
                     var message = string.Join(";", userRoleResult.Errors.Select(e => e.Description));
 
                     await _unitOfWork.Rollback();
+
+                    _logger.LogError(
+                        "Failed to assign role to the new user through User Manager. UserName={UserName}, Email={Email}, Role={Role}",
+                        request.UserName,
+                        request.Email,
+                        roleType);
 
                     return new SignUpResponse
                     {
@@ -134,6 +178,13 @@ namespace Recam.Services.Services
                 // Log user activity to MongoDB when successfully signed up
                 await LogUserActivity(user.Id, user.UserName, user.Email, "SignUp", result.Succeeded, "Successfully signed up.");
 
+                _logger.LogInformation(
+                    "SignUp completed. UserId={UserId}, UserName={UserName}, Email={Email}, Role={Role}",
+                    user.Id,
+                    user.UserName,
+                    user.Email,
+                    roleType);
+
                 // On success
                 return new SignUpResponse
                 {
@@ -142,9 +193,17 @@ namespace Recam.Services.Services
                 };
 
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 await _unitOfWork.Rollback();
+
+                _logger.LogError(
+                        ex,
+                        "Failed to sign up the new user. UserName={UserName}, Email={Email}, Role={Role}",
+                        request.UserName,
+                        request.Email,
+                        roleType);
+
                 throw;
             }
         }
@@ -153,11 +212,19 @@ namespace Recam.Services.Services
         {
             var user = await _userManager.FindByEmailAsync(request.Email);
 
+            _logger.LogInformation(
+                "Start logining. Email={Email}",
+                request.Email);
+
             // User not found
             if (user == null)
             {
                 // Log failed user login attempts to MongoDB for security purpose
                 await LogUserActivity(userId: null, userName: null, request.Email, "Login", false, LoginStatus.UserNotFound.ToString());
+
+                _logger.LogWarning(
+                    "Failed to find the user. Email={Email}",
+                    request.Email);
 
                 return new LoginResponse
                 {
@@ -180,6 +247,10 @@ namespace Recam.Services.Services
                 // Log failed user login attempts to MongoDB for security purpose
                 await LogUserActivity(user.Id, user.UserName, user.Email, "Login", false, status.ToString());
 
+                _logger.LogWarning(
+                    "Login in error. Email={Email}",
+                    request.Email);
+
                 return new LoginResponse
                 {
                     Status = status,
@@ -193,6 +264,10 @@ namespace Recam.Services.Services
             }
 
             // Login success
+            _logger.LogInformation(
+                "Generating JWT. Email={Email}",
+                request.Email);
+
             var token = await JWTGenerator(user, 7);
 
             var roles = await _userManager.GetRolesAsync(user);
@@ -235,6 +310,12 @@ namespace Recam.Services.Services
                 }
             }
 
+            _logger.LogInformation(
+                "Login completed. UserId={UserId}, Email={Email}, Role={Role}",
+                user.Id,
+                user.Email,
+                role);
+
             return response;
         }
 
@@ -269,6 +350,52 @@ namespace Recam.Services.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
+        public async Task<GetUsersResponse> GetAllUsers(int pageNumber, int pageSize)
+        {
+            _logger.LogInformation(
+                  "Start retrieving all users. PageNumber={PageNumber}, PageSize={PageSize}",
+                  pageNumber,
+                  pageSize);
+
+            if (pageNumber < 1 || pageSize < 1)
+            {
+                _logger.LogWarning(
+                    "Invalid pageNumber or pageSize when retrieving all users. PageNumber={PageNumber}, PageSize={PageSize}",
+                    pageNumber,
+                    pageSize);
+
+                return new GetUsersResponse
+                {
+                    Status = GetUsersStatus.Error,
+                    ErrorMessage = "pageNumber and pageSize must be greater than 0."
+                };
+            }
+
+            _logger.LogInformation(
+                  "Retrieving all users.");
+
+            var users = await _authRepository.GetUsersPaginated(pageNumber, pageSize);
+            var totalCount = await _authRepository.GetUsersTotal();
+
+            var userDtos = _mapper.Map<List<UserDto>>(users);
+
+            var userIds = userDtos.Select(x => x.Id).ToList();
+
+            _logger.LogInformation(
+                  "GetAllUsers completed. TotalUsersCount={TotalUsersCount}, PageNumber={PageNumber}, PageSize={PageSize}, UserIds={UserIds}",
+                  totalCount,
+                  pageNumber,
+                  pageSize,
+                  userIds);
+
+            return new GetUsersResponse
+            {
+                Status = GetUsersStatus.Success,
+                Users = userDtos,
+                TotalCount = totalCount
+            };
+        }
+
         private async Task LogUserActivity(string? userId, string? userName, string email, string action, bool result, string? message)
         {
             var log = new UserActivityLog
@@ -286,34 +413,17 @@ namespace Recam.Services.Services
             {
                 await _userActivityLogRepository.Insert(log);
             }
-            catch (Exception exception)
+            catch (Exception ex)
             {
-                // TODO: 日志写失败不要影响业务流程，只在内部记录一下即可
+                _logger.LogError(
+                    ex,
+                    "Failed to log user activity. " +
+                    "UserId={UserId}, Action={Action}, Result={Result}",
+                    userId,
+                    action,
+                    result
+                );
             }
-        }
-
-        public async Task<GetUsersResponse> GetAllUsers(int pageNumber, int pageSize)
-        {
-            if (pageNumber < 1 || pageSize < 1)
-            {
-                return new GetUsersResponse
-                {
-                    Status = GetUsersStatus.Error,
-                    ErrorMessage = "pageNumber and pageSize must be greater than 0."
-                };
-            }
-            
-            var users = await _authRepository.GetUsersPaginated(pageNumber, pageSize);
-            var totalCount = await _authRepository.GetUsersTotal();
-
-            var userDtos = _mapper.Map<List<UserDto>>(users);
-
-            return new GetUsersResponse
-            {
-                Status = GetUsersStatus.Success,
-                Users = userDtos,
-                TotalCount = totalCount
-            };
         }
     }
 }
