@@ -63,7 +63,7 @@ namespace Recam.DataAccess.Seeders
             const string agentEmail = "agent@example.com";
             const string pcUserName = "photography_admin";
             const string agentUserName = "agent_user";
-            const string password = "12345Abc!"; //TODO: Hardcoded password for now (change strategy when connected to cloud)
+            const string password = "12345Abcde!"; //TODO: Hardcoded password for now (change strategy when connected to cloud)
             const string photographyCompanyName = "Default Photography Company";
             const string agentFistName = "AF";
             const string agentLastName = "AL";

@@ -14,5 +14,6 @@ namespace Recam.Services.Interfaces
         Task<LoginResponse> Login(LoginRequest request);
         Task<GetUsersResponse> GetAllUsers(int pageNumber, int pageSize);
         Task<GetCurrentUserInfoResponse> GetCurrentUserInfo(ClaimsPrincipal user);
+        Task<UpdatePasswordResponse> UpdatePassword(UpdatePasswordRequest request, ClaimsPrincipal user);
     }
 }

@@ -8,6 +8,7 @@ using Recam.Models.Entities;
 using Recam.Services.DTOs;
 using Recam.Services.Interfaces;
 using static Recam.Services.DTOs.GetCurrentUserInfoResponse;
+using static Recam.Services.DTOs.UpdatePasswordResponse;
 
 namespace Recam.API.Controllers
 {
@@ -170,6 +171,38 @@ namespace Recam.API.Controllers
             {
                 return Ok(result);
             }
+        }
+
+        /// <summary>
+        /// Updates the authenticated user's password using the provided credentials.
+        /// </summary>
+        /// <remarks>The user must be authenticated to call this endpoint. The request will fail if the
+        /// current password is incorrect, the new password does not meet security requirements, or the user does not
+        /// exist.</remarks>
+        /// <param name="request">An object containing the current password and the new password to set. Must include valid, non-empty values
+        /// for both fields.</param>
+        /// <returns>An <see cref="IActionResult"/> indicating the result of the password update operation. Returns 200 OK with
+        /// an <see cref="UpdatePasswordResponse"/> if successful; 400 Bad Request with an <see cref="ErrorResponse"/>
+        /// if the request is invalid; 401 Unauthorized if the user is not found or authentication fails; or 500
+        /// Internal Server Error for unexpected failures.</returns>
+        [HttpPatch("password")]
+        [Authorize]
+        [ProducesResponseType(typeof(UpdatePasswordResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UpdatePassword([FromBody] UpdatePasswordRequest request)
+        {
+            var result = await _authService.UpdatePassword(request, User);
+
+            return result.Result switch
+            {
+                UpdatePasswordResult.Success => Ok(result),
+                UpdatePasswordResult.UserNotFound => Unauthorized(new ErrorResponse(401, result.ErrorMessage, "UserNotFound")),
+                UpdatePasswordResult.InvalidCurrentPassword => BadRequest(new ErrorResponse(400, result.ErrorMessage, "InvalidCurrentPassword")),
+                UpdatePasswordResult.InvalidNewPassword => BadRequest(new ErrorResponse(400, result.ErrorMessage, "InvalidNewPassword")),
+                _ => StatusCode(500, new ErrorResponse(500, result.ErrorMessage, "ServerError"))
+            };
         }
     }
 }
