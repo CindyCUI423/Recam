@@ -82,5 +82,55 @@ namespace Recam.UnitTests
             });
 
         }
+
+        [Fact]
+        public async Task GetAssignedListingCaseIds_FiltersByAgentUserId_ReturnsListingCaseIds()
+        {
+            // Arrange
+            await _dbContext.AgentListingCases.AddRangeAsync(
+                // agent-1
+                new AgentListingCase { AgentId = "agent-1", ListingCaseId = 101 },
+                new AgentListingCase { AgentId = "agent-1", ListingCaseId = 102 },
+                // agent-2
+                new AgentListingCase { AgentId = "agent-2", ListingCaseId = 999 }
+            );
+
+            await _dbContext.SaveChangesAsync();
+
+            // Act
+            var result = await _authRepository.GetAssignedListingCaseIds("agent-1");
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal(2, result!.Count);
+            Assert.Contains(101, result);
+            Assert.Contains(102, result);
+            Assert.DoesNotContain(999, result);
+        }
+
+        [Fact]
+        public async Task GetAssociatedListingCaseIds_FiltersByPhotographyCompanyUserId_ReturnsListingCaseIds()
+        {
+            // Arrange
+            await _dbContext.ListingCases.AddRangeAsync(
+                // photographycompany-1
+                new ListingCase { Id = 1, UserId = "pc-1", City = "Sydney", State = "NSW", Street="23 Main St", Title = "Test Listing Case" },
+                new ListingCase { Id = 2, UserId = "pc-1", City = "Sydney", State = "NSW", Street = "23 Main St", Title = "Test Listing Case" },
+                // photographycompany-1
+                new ListingCase { Id = 3, UserId = "pc-2", City = "Sydney", State = "NSW", Street = "23 Main St", Title = "Test Listing Case" }
+            );
+
+            await _dbContext.SaveChangesAsync();
+
+            // Act
+            var result = await _authRepository.GetAssociatedListingCaseIds("pc-1");
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal(2, result!.Count);
+            Assert.Contains(1, result);
+            Assert.Contains(2, result);
+            Assert.DoesNotContain(3, result);
+        }
     }
 }
