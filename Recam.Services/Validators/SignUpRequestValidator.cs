@@ -30,7 +30,7 @@ namespace Recam.Services.Validators
                 .MinimumLength(_identityOptions.Password.RequiredLength)
                 .WithMessage($"Password must be at least {_identityOptions.Password.RequiredLength} characters.");
 
-            // Other email rules
+            // Other password rules
             if (_identityOptions.Password.RequireDigit)
             {
                 RuleFor(x => x.Password)

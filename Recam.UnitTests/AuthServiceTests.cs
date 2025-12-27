@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
+using Azure.Core;
 using DnsClient.Internal;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -13,9 +15,12 @@ using Recam.Services.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using Xunit;
+using static Recam.Services.DTOs.GetCurrentUserInfoResponse;
+using static Recam.Services.DTOs.UpdatePasswordResponse;
 
 namespace Recam.UnitTests
 {
@@ -70,6 +75,27 @@ namespace Recam.UnitTests
                 _mockUnitOfWork.Object,
                 _mockLogger.Object);
         }
+
+        private static ClaimsPrincipal BuildUser(string? userId, string? role)
+        {
+            var claims = new List<Claim>();
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                claims.Add(new Claim(ClaimTypes.NameIdentifier, userId));
+            }
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            var identity = new ClaimsIdentity(claims, authenticationType: "mock");
+
+            return new ClaimsPrincipal(identity);
+        }
+
+        #region SignUp Tests
 
         [Fact]
         public async Task SignUp_UserNameExists_ReturnUserNameAlreadyExists()
@@ -298,6 +324,10 @@ namespace Recam.UnitTests
             ), Times.Once);
         }
 
+        #endregion
+
+        #region Login Tests
+
         [Fact]
         public async Task Login_UserIsNull_ReturnsUserNotFound()
         {
@@ -442,6 +472,10 @@ namespace Recam.UnitTests
                     l.Message == "Successfully logged in.")), Times.Once);
         }
 
+        #endregion
+
+        #region GetAllUsers Tests
+
         [Theory]
         [InlineData(0, 10)]
         [InlineData(3, 0)]
@@ -496,5 +530,249 @@ namespace Recam.UnitTests
             _mockAuthRepo.Verify(r => r.GetUsersTotal(), Times.Once);
             _mockMapper.Verify(m => m.Map<List<UserDto>>(users), Times.Once);
         }
+
+        #endregion
+
+        #region GetCurrentUserInfo Tests
+
+        [Fact]
+        public async Task GetCurrentUserInfo_InvalidUserId_ReturnUserNotFound()
+        {
+            // Arrange
+            var user = BuildUser(null, "Agent");
+
+            // Act
+            var result = await _authService.GetCurrentUserInfo(user);
+
+            // Assert
+            Assert.Equal(GetCurrentUserInfoResult.UserNotFound, result.Result);
+            Assert.Equal("Unable to find the user id due to user id claim missing.", result.ErrorMessage);
+            _mockAuthRepo.Verify(r => r.GetAssignedListingCaseIds(It.IsAny<string>()), Times.Never);
+            _mockAuthRepo.Verify(r => r.GetAssociatedListingCaseIds(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task GetCurrentUserInfo_InvalidRole_ReturnSuccessWithEmptyListingCaseIds()
+        {
+            // Arrange
+            var userId = "test-user";
+            var role = "other-role";
+            var user = BuildUser(userId, role);
+
+            // Act
+            var result = await _authService.GetCurrentUserInfo(user);
+
+            // Assert
+            Assert.Equal(GetCurrentUserInfoResult.Success, result.Result);
+            Assert.Equal(userId, result.Id);
+            Assert.Equal(role, result.Role);
+            Assert.NotNull(result.ListingCaseIds);
+            Assert.Empty(result.ListingCaseIds);
+            _mockAuthRepo.Verify(r => r.GetAssignedListingCaseIds(It.IsAny<string>()), Times.Never);
+            _mockAuthRepo.Verify(r => r.GetAssociatedListingCaseIds(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task GetCurrentUserInfo_ValidRole_ReturnSuccess()
+        {
+            // Arrange
+            var userId = "test-user";
+            var role = "Agent";
+            var user = BuildUser(userId, role);
+
+            var listingCaseIds = new List<int> { 1, 2, 3};
+
+            _mockAuthRepo.Setup(r => r.GetAssignedListingCaseIds(userId)).ReturnsAsync(listingCaseIds);
+
+            // Act
+            var result = await _authService.GetCurrentUserInfo(user);
+
+            // Assert
+            Assert.Equal(GetCurrentUserInfoResult.Success, result.Result);
+            Assert.Equal(userId, result.Id);
+            Assert.Equal(role, result.Role);
+            Assert.Equal(listingCaseIds, result.ListingCaseIds);
+            _mockAuthRepo.Verify(r => r.GetAssignedListingCaseIds(It.IsAny<string>()), Times.Once);
+            _mockAuthRepo.Verify(r => r.GetAssociatedListingCaseIds(It.IsAny<string>()), Times.Never);
+        }
+
+        #endregion
+
+        #region UpdatePassword Tests
+
+        [Fact]
+        public async Task UpdatePassword_InvalidUserId_ReturnUserNotFound()
+        {
+            // Arrange
+            var user = BuildUser(null, "Agent");
+
+            var request = new UpdatePasswordRequest
+            {
+                CurrentPassword = "1234Abcd!",
+                NewPassword = "NewP@ssword890"
+            };
+
+            // Act
+            var result = await _authService.UpdatePassword(request, user);
+
+            // Assert
+            Assert.Equal(UpdatePasswordResult.UserNotFound, result.Result);
+            Assert.Equal("Unable to find the user id due to user id claim missing.", result.ErrorMessage);
+            _mockUserManager.Verify(m => m.ChangePasswordAsync(It.IsAny<User>(), request.CurrentPassword, request.NewPassword), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdatePassword_UserNotFound_ReturnUserNotFound()
+        {
+            // Arrange
+            var userId = "invalid-user";
+            var user = BuildUser(userId, "Agent");
+
+            var request = new UpdatePasswordRequest
+            {
+                CurrentPassword = "1234Abcd!",
+                NewPassword = "NewP@ssword890"
+            };
+
+            _mockUserManager.Setup(m => m.FindByIdAsync(userId)).ReturnsAsync((User)null);
+
+            // Act
+            var result = await _authService.UpdatePassword(request, user);
+
+            // Assert
+            Assert.Equal(UpdatePasswordResult.UserNotFound, result.Result);
+            Assert.Equal("Unable to find the user in db.", result.ErrorMessage);
+            _mockUserManager.Verify(m => m.ChangePasswordAsync(It.IsAny<User>(), request.CurrentPassword, request.NewPassword), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdatePassword_CurrentPasswordMismatch_ReturnsInvalidCurrentPassword()
+        {
+            // Arrange
+            var userId = "u1";
+
+            var user = BuildUser(userId, "Agent");
+
+            var dbUser = new User { Id = userId, UserName="test-user", Email="u1@example.com"};
+
+            var request = new UpdatePasswordRequest
+            {
+                CurrentPassword = "WrongCurrentPassword",
+                NewPassword = "NewP@ssword890"
+            };
+
+            _mockUserManager.Setup(m => m.FindByIdAsync(userId)).ReturnsAsync(dbUser);
+
+            var identityErrors = new[] { new IdentityError { Code = "PasswordMismatch", Description = "wrong password" } };
+
+            _mockUserManager.Setup(m => m.ChangePasswordAsync(dbUser, request.CurrentPassword, request.NewPassword))
+                            .ReturnsAsync(IdentityResult.Failed(identityErrors));
+
+            _mockUserActivityLogRepo.Setup(r => r.Insert(It.IsAny<UserActivityLog>())).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _authService.UpdatePassword(request, user);
+
+            // Assert
+            Assert.Equal(UpdatePasswordResult.InvalidCurrentPassword, result.Result);
+            Assert.Equal("Current password is incorrect.", result.ErrorMessage);
+            _mockUserManager.Verify(m => m.ChangePasswordAsync(It.IsAny<User>(), request.CurrentPassword, request.NewPassword), Times.Once);
+            _mockUserActivityLogRepo.Verify(r => r.Insert(It.IsAny<UserActivityLog>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePassword_NewPasswordInvalid_ReturnsInvalidNewPassword()
+        {
+            // Arrange
+            var userId = "u1";
+
+            var user = BuildUser(userId, "Agent");
+
+            var dbUser = new User { Id = userId, UserName = "test-user", Email = "u1@example.com" };
+
+            var request = new UpdatePasswordRequest
+            {
+                CurrentPassword = "1234Abcd!",
+                NewPassword = "InvalidNewPassword"
+            };
+
+            _mockUserManager.Setup(m => m.FindByIdAsync(userId)).ReturnsAsync(dbUser);
+
+            var identityErrors = new[] { new IdentityError { Code = "PasswordRequiresNumber", Description = "Password must include at least one digital number" } };
+
+            _mockUserManager.Setup(m => m.ChangePasswordAsync(dbUser, request.CurrentPassword, request.NewPassword))
+                            .ReturnsAsync(IdentityResult.Failed(identityErrors));
+
+            _mockUserActivityLogRepo.Setup(r => r.Insert(It.IsAny<UserActivityLog>())).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _authService.UpdatePassword(request, user);
+
+            // Assert
+            Assert.Equal(UpdatePasswordResult.InvalidNewPassword, result.Result);
+            Assert.Contains("Password must include at least one digital number", result.ErrorMessage);
+            _mockUserManager.Verify(m => m.ChangePasswordAsync(It.IsAny<User>(), request.CurrentPassword, request.NewPassword), Times.Once);
+            _mockUserActivityLogRepo.Verify(r => r.Insert(It.IsAny<UserActivityLog>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePassword_WhenExceptionThrown_ReturnsError()
+        {
+            // Arrange
+            var userId = "u1";
+
+            _mockUserManager.Setup(m => m.FindByIdAsync(userId)).ThrowsAsync(new Exception("something wrong"));
+
+            var user = BuildUser(userId, "Agent");
+
+            var request = new UpdatePasswordRequest
+            {
+                CurrentPassword = "1234Abcd!",
+                NewPassword = "InvalidNewPassword"
+            };
+
+            // Act
+            var result = await _authService.UpdatePassword(request, user);
+
+            // Assert
+            Assert.Equal(UpdatePasswordResult.Error, result.Result);
+            Assert.Equal("An unexpected error occurred.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task UpdatePassword_WhenSucceed_ReturnsSuccess()
+        {
+            // Arrange
+            var userId = "u1";
+
+            var user = BuildUser(userId, "Agent");
+
+            var dbUser = new User { Id = userId, UserName = "test-user", Email = "u1@example.com" };
+
+            var request = new UpdatePasswordRequest
+            {
+                CurrentPassword = "1234Abcd!",
+                NewPassword = "InvalidNewPassword"
+            };
+
+            _mockUserManager.Setup(m => m.FindByIdAsync(userId)).ReturnsAsync(dbUser);
+
+            _mockUserManager.Setup(m => m.ChangePasswordAsync(dbUser, request.CurrentPassword, request.NewPassword))
+                            .ReturnsAsync(IdentityResult.Success);
+
+            _mockUserActivityLogRepo.Setup(r => r.Insert(It.IsAny<UserActivityLog>())).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _authService.UpdatePassword(request, user);
+
+            // Assert
+            Assert.Equal(UpdatePasswordResult.Success, result.Result);
+            _mockUserManager.Verify(m => m.ChangePasswordAsync(It.IsAny<User>(), request.CurrentPassword, request.NewPassword), Times.Once);
+            _mockUserActivityLogRepo.Verify(r => r.Insert(It.IsAny<UserActivityLog>()), Times.Once);
+        }
+
+
+
+        #endregion
     }
 }

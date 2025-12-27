@@ -72,7 +72,7 @@ public class Program
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
 
-        // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+        // Learn more about configuring Swagger/OpenAfPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {
@@ -255,24 +255,42 @@ public class Program
         );
 
         // Configure the HTTP request pipeline.
-        if (app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
         {
             app.UseSwagger();
             app.UseSwaggerUI();
         }
 
-        // Call seeder
-        using (var scope = app.Services.CreateScope())
+        var runSeeder = builder.Configuration.GetValue<bool>("RUN_DB_SEEDER");
+
+        if (runSeeder) 
         {
-            var services = scope.ServiceProvider;
-            await RecamDbSeeder.SeedAsync(services);
+            try
+            {
+                await RecamDbSeeder.SeedAsync(app.Services);
+            }
+            catch (Exception ex)
+            {
+                app.Logger.LogError(ex, "Database seeding failed");
+            }
         }
+
+        // Call seeder
+        //using (var scope = app.Services.CreateScope())
+        //{
+        //    var services = scope.ServiceProvider;
+        //    await RecamDbSeeder.SeedAsync(services);
+        //}
 
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
 
         app.MapControllers();
+
+        app.MapGet("/", () => Results.Ok("Recam API is running"));
+        app.MapGet("/health", () => Results.Ok("OK"));
+        app.MapGet("/env", (IHostEnvironment env) => Results.Ok(env.EnvironmentName));
 
         app.Run();
     }

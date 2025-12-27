@@ -1,0 +1,23 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Recam.Services.DTOs
+{
+    public class GetCurrentUserInfoResponse
+    {
+        public GetCurrentUserInfoResult Result { get; set; }
+        public string? ErrorMessage { get; set; }
+        public string? Id { get; set; }
+        public string? Role { get; set; }
+        public List<int>? ListingCaseIds { get; set; }
+
+        public enum GetCurrentUserInfoResult
+        {
+            Success,
+            UserNotFound,
+        }
+    }
+}

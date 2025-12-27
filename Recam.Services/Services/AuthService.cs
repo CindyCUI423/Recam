@@ -21,6 +21,8 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using static Recam.Services.DTOs.GetCurrentUserInfoResponse;
+using static Recam.Services.DTOs.UpdatePasswordResponse;
 using Role = Recam.Models.Entities.Role;
 
 namespace Recam.Services.Services
@@ -396,6 +398,168 @@ namespace Recam.Services.Services
             };
         }
 
+        public async Task<GetCurrentUserInfoResponse> GetCurrentUserInfo(ClaimsPrincipal user)
+        {
+            // Get the user id
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                _logger.LogWarning("Unable to find the user id due to user id claim missing.");
+                
+                return new GetCurrentUserInfoResponse
+                {
+                    Result = GetCurrentUserInfoResult.UserNotFound,
+                    ErrorMessage = "Unable to find the user id due to user id claim missing."
+                };
+            }
+
+            // Get the user role
+            var role = user.FindFirstValue(ClaimTypes.Role);
+
+
+            _logger.LogInformation(
+                  "Start retrieving the current user information. UserId={UserId}, Role={Role}",
+                  userId,
+                  role);
+
+            // Get assigned listing case ids
+            var listingIds = new List<int>();
+
+            if (role == "Agent")
+            {
+                listingIds = await _authRepository.GetAssignedListingCaseIds(userId);
+            }
+            else if (role == "PhotographyCompany")
+            {
+                listingIds = await _authRepository.GetAssociatedListingCaseIds(userId);
+            }
+
+            _logger.LogInformation(
+                "GetCurrentUserInfo completed. UserId={UserId}, Role={Role}, ListingCaseIds={ListingCaseIds}",
+                userId,
+                role,
+                listingIds);
+
+            return new GetCurrentUserInfoResponse
+            {
+                Result = GetCurrentUserInfoResult.Success,
+                Id = userId,
+                Role = role,
+                ListingCaseIds = listingIds
+            };
+
+        }
+
+        public async Task<UpdatePasswordResponse> UpdatePassword(UpdatePasswordRequest request, ClaimsPrincipal user)
+        {
+            // Get the user id
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                _logger.LogWarning("Unable to find the user id due to user id claim missing.");
+
+                return new UpdatePasswordResponse
+                {
+                    Result = UpdatePasswordResult.UserNotFound,
+                    ErrorMessage = "Unable to find the user id due to user id claim missing."
+                };
+            }
+
+            try
+            {
+                // Find the user from db
+                var dbUser = await _userManager.FindByIdAsync(userId);
+
+                if (dbUser == null)
+                {
+                    _logger.LogWarning(
+                        "Unable to find the user in db. UserId={UserId}",
+                        userId);
+
+                    return new UpdatePasswordResponse
+                    {
+                        Result = UpdatePasswordResult.UserNotFound,
+                        ErrorMessage = "Unable to find the user in db."
+                    };
+                }
+
+                // Update the password
+                var result = await _userManager.ChangePasswordAsync(
+                    dbUser,
+                    request.CurrentPassword,
+                    request.NewPassword);
+
+                if (!result.Succeeded)
+                {
+                    var errorCodes = result.Errors.Select(e => e.Code).ToList();
+                    var message = string.Join(";", result.Errors.Select(e => e.Description));
+
+                    // Invalid current password
+                    if (errorCodes.Any(c => string.Equals(c, "PasswordMismatch", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // Log the user activity
+                        await LogUserActivity(userId, dbUser.UserName, dbUser.Email, "ChangePassword", false, "Failed to update password because of the wrong current password");
+
+                        _logger.LogWarning(
+                               "Failed to update password because of the wrong current password. UserId={UserId}",
+                               userId);
+
+                        return new UpdatePasswordResponse
+                        {
+                            Result = UpdatePasswordResult.InvalidCurrentPassword,
+                            ErrorMessage = "Current password is incorrect."
+                        };
+                    }
+
+                    // Log the user activity
+                    await LogUserActivity(userId, dbUser.UserName, dbUser.Email, "ChangePassword", false, message);
+
+                    // Fail the password policy
+                    _logger.LogWarning(
+                            "Failed to update password due to password policy. UserId={UserId}, Errors={Errors}",
+                            userId,
+                            message);
+
+                    return new UpdatePasswordResponse
+                    {
+                        Result = UpdatePasswordResult.InvalidNewPassword,
+                        ErrorMessage = message
+                    };
+
+                }
+
+                // Log the user activity
+                await LogUserActivity(userId, dbUser.UserName, dbUser.Email, "ChangePassword", true, null);
+
+                _logger.LogInformation(
+                    "Password updated successfully. UserId={UserId}, Email={Email}",
+                    userId,
+                    dbUser.Email);
+
+                return new UpdatePasswordResponse
+                {
+                    Result = UpdatePasswordResult.Success
+                };
+            }
+            catch (Exception ex) 
+            {
+                _logger.LogError(
+                    ex, 
+                    "Unexpected error when updating password. UserId={UserId}",
+                    userId);
+
+                return new UpdatePasswordResponse
+                {
+                    Result = UpdatePasswordResult.Error,
+                    ErrorMessage = "An unexpected error occurred."
+                };
+            }
+
+
+        }
+
         private async Task LogUserActivity(string? userId, string? userName, string email, string action, bool result, string? message)
         {
             var log = new UserActivityLog
@@ -425,5 +589,7 @@ namespace Recam.Services.Services
                 );
             }
         }
+
+        
     }
 }
